@@ -74,6 +74,10 @@ US_REALTIME_SECTORS: list[dict[str, Any]] = [
     {"code": "ITA", "name": "航空航天与国防 (ITA)", "leaders": ["LMT", "RTX", "BA"]},
     {"code": "XOP", "name": "油气勘探与开采 (XOP)", "leaders": ["EOG", "DVN", "FANG"]},
     {"code": "XRT", "name": "商业零售连锁 (XRT)", "leaders": ["WMT", "TGT", "COST"]},
+    {"code": "XME", "name": "金属与采矿 (XME)", "leaders": ["NEM", "FCX", "AA"]},
+    {"code": "XHB", "name": "建筑与家居零售 (XHB)", "leaders": ["HD", "LOW", "DHI"]},
+    {"code": "IYT", "name": "交通运输与物流 (IYT)", "leaders": ["UNP", "UPS", "FDX"]},
+    {"code": "KIE", "name": "保险行业 (KIE)", "leaders": ["TRV", "CB", "PGR"]},
 ]
 
 US_REALTIME_THEMES: list[dict[str, Any]] = [
@@ -93,6 +97,10 @@ US_REALTIME_THEMES: list[dict[str, Any]] = [
     {"code": "KWEB", "name": "中概互联网科技 (KWEB)", "leaders": ["BABA", "PDD", "JD"]},
     {"code": "JETS", "name": "全球航空与旅游 (JETS)", "leaders": ["DAL", "UAL", "AAL"]},
     {"code": "FINX", "name": "金融科技与数字支付 (FINX)", "leaders": ["PYPL", "AFRM", "SOFI"]},
+    {"code": "AIQ", "name": "生成式AI与大数据 (AIQ)", "leaders": ["NVDA", "MSFT", "PLTR"]},
+    {"code": "PAVE", "name": "美国基建与电网升级 (PAVE)", "leaders": ["ETN", "PWR", "URI"]},
+    {"code": "ICLN", "name": "全球清洁能源 (ICLN)", "leaders": ["ENPH", "FSLR", "NEE"]},
+    {"code": "BLOK", "name": "区块链与数字资产 (BLOK)", "leaders": ["COIN", "MSTR", "RIOT"]},
 ]
 
 
@@ -781,9 +789,9 @@ def get_realtime_flow_data(market: str = "CN", force: bool = False) -> dict[str,
     con_in_cnt = sum(1 for x in concepts if x["net_flow"] > 0)
 
     quadrant_points = [
-        {**x, "kind": "行业"} for x in industries[:15] + industries[-10:]
+        {**x, "kind": "行业"} for x in industries
     ] + [
-        {**x, "kind": "题材"} for x in concepts[:15] + concepts[-10:]
+        {**x, "kind": "题材"} for x in concepts
     ]
     # Deduplicate quadrant points by name + kind
     seen_qp: set[tuple[str, str]] = set()

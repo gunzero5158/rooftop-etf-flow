@@ -199,24 +199,29 @@
 
       <!-- Chart Row 2 -->
       <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div class="card-panel p-4 lg:col-span-6 flex flex-col">
+        <div class="card-panel p-4 lg:col-span-5 flex flex-col">
           <div class="flex items-center justify-between mb-2">
             <div>
               <h3 class="text-sm font-bold text-white">行业 / 题材 ETF 资金净流向排行</h3>
               <p class="text-[11px] text-[#8b98aa] mt-0.5">识别增量主线吸金板块与资金撤离方向</p>
             </div>
           </div>
-          <div id="chart-sectors" class="w-full h-[380px]"></div>
+          <div id="chart-sectors" class="w-full h-[460px]"></div>
         </div>
 
-        <div class="card-panel p-4 lg:col-span-6 flex flex-col">
-          <div class="flex items-center justify-between mb-2">
+        <div class="card-panel p-4 lg:col-span-7 flex flex-col">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
-              <h3 class="text-sm font-bold text-white">涨跌幅 × 资金净流向 四象限轮动图</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5">气泡大小映射最新规模；区分主线共振、逢高兑现与逆势抄底</p>
+              <h3 class="text-sm font-bold text-white">涨跌幅 × 资金净流向 四象限轮动矩阵</h3>
+              <p class="text-[11px] text-[#8b98aa] mt-0.5">清晰区分主线共振、逆势抄底、逢高兑现与资金撤离四大资金行为</p>
+            </div>
+            <div class="seg-group" id="pm-quadrant-mode">
+              <button class="seg-btn active" data-qmode="matrix">矩阵视图</button>
+              <button class="seg-btn" data-qmode="scatter">散点图</button>
             </div>
           </div>
-          <div id="chart-quadrant" class="w-full h-[380px]"></div>
+          <div id="pm-quadrant-matrix" class="quadrant-matrix-grid"></div>
+          <div id="chart-quadrant" class="w-full h-[460px] hidden"></div>
         </div>
       </section>
 
@@ -367,54 +372,73 @@
         <div id="rt-insights-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs sm:text-[13px]"></div>
       </section>
 
-      <!-- Realtime Charts Row 1: Industries vs Concepts -->
+      <!-- Realtime Charts Row 1: Industries vs Concepts (Top 20 each) -->
       <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div class="card-panel p-4 lg:col-span-6 flex flex-col">
-          <div class="flex items-center justify-between mb-2 gap-2">
+          <div class="flex flex-wrap items-center justify-between mb-2 gap-2">
             <div>
-              <h3 class="text-sm font-bold text-white">【分行业】资金流向排行 (Top流入 / 流出)</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5">展示净流入前8与净流出前8行业板块</p>
+              <h3 class="text-sm font-bold text-white">【分行业】资金流向排行（展示 20 个）</h3>
+              <p class="text-[11px] text-[#8b98aa] mt-0.5">支持切换首尾各10、净流入Top20或净流出Top20</p>
             </div>
-            <span class="rt-date-tag badge-tag bg-[#1c2030] text-[#a8b5c7] border border-[#2a2e39]">--</span>
+            <div class="flex items-center gap-1.5">
+              <div class="seg-group" id="rt-ind-rank-mode">
+                <button class="seg-btn active" data-rankmode="split">各10</button>
+                <button class="seg-btn" data-rankmode="inflow">流入20</button>
+                <button class="seg-btn" data-rankmode="outflow">流出20</button>
+              </div>
+              <span class="rt-date-tag badge-tag bg-[#1c2030] text-[#a8b5c7] border border-[#2a2e39]">--</span>
+            </div>
           </div>
-          <div id="chart-rt-industries" class="w-full h-[380px]"></div>
+          <div id="chart-rt-industries" class="w-full h-[460px]"></div>
         </div>
 
         <div class="card-panel p-4 lg:col-span-6 flex flex-col">
-          <div class="flex items-center justify-between mb-2 gap-2">
+          <div class="flex flex-wrap items-center justify-between mb-2 gap-2">
             <div>
-              <h3 class="text-sm font-bold text-white">【分题材 / 概念】资金流向排行 (Top流入 / 流出)</h3>
+              <h3 class="text-sm font-bold text-white">【分题材 / 概念】资金流向排行（展示 20 个）</h3>
               <p class="text-[11px] text-[#8b98aa] mt-0.5">已自动过滤通道/成分标签，聚焦真实交易主线题材</p>
             </div>
-            <span class="rt-date-tag badge-tag bg-[#1c2030] text-[#a8b5c7] border border-[#2a2e39]">--</span>
+            <div class="flex items-center gap-1.5">
+              <div class="seg-group" id="rt-con-rank-mode">
+                <button class="seg-btn active" data-rankmode="split">各10</button>
+                <button class="seg-btn" data-rankmode="inflow">流入20</button>
+                <button class="seg-btn" data-rankmode="outflow">流出20</button>
+              </div>
+              <span class="rt-date-tag badge-tag bg-[#1c2030] text-[#a8b5c7] border border-[#2a2e39]">--</span>
+            </div>
           </div>
-          <div id="chart-rt-concepts" class="w-full h-[380px]"></div>
+          <div id="chart-rt-concepts" class="w-full h-[460px]"></div>
         </div>
       </section>
 
-      <!-- Realtime Charts Row 2: Quadrant + Monitored ETF Intraday Flow -->
-      <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div class="card-panel p-4 lg:col-span-6 flex flex-col">
-          <div class="flex items-center justify-between mb-2 gap-2">
-            <div>
-              <h3 class="text-sm font-bold text-white">行业 × 题材 涨跌幅与资金流四象限</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5">圆形为行业板块、菱形为概念题材，气泡大小映射成交额</p>
+      <!-- Realtime Charts Row 2: Full-Width Quadrant Matrix + Monitored ETFs -->
+      <section class="card-panel p-4 flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white">行业 × 题材 涨跌幅与资金流四象限轮动矩阵</h3>
+            <p class="text-[11px] text-[#8b98aa] mt-0.5">全市场覆盖板块按象限归类汇总，一目了然辨识主线共振、逆势抄底与逢高兑现</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="seg-group" id="rt-quadrant-mode">
+              <button class="seg-btn active" data-qmode="matrix">矩阵视图</button>
+              <button class="seg-btn" data-qmode="scatter">散点图</button>
             </div>
             <span class="rt-date-tag badge-tag bg-[#1c2030] text-[#a8b5c7] border border-[#2a2e39]">--</span>
           </div>
-          <div id="chart-rt-quadrant" class="w-full h-[360px]"></div>
         </div>
+        <div id="rt-quadrant-matrix" class="quadrant-matrix-grid"></div>
+        <div id="chart-rt-quadrant" class="w-full h-[460px] hidden"></div>
+      </section>
 
-        <div class="card-panel p-4 lg:col-span-6 flex flex-col">
-          <div class="flex items-center justify-between mb-2 gap-2">
-            <div>
-              <h3 class="text-sm font-bold text-white">监控池 ETF 盘中主动资金流排行</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5">基于内外盘主动买卖差额 / 日内量价乘数实时测算</p>
-            </div>
-            <span class="rt-date-tag badge-tag bg-[#1c2030] text-[#a8b5c7] border border-[#2a2e39]">--</span>
+      <section class="card-panel p-4 flex flex-col">
+        <div class="flex items-center justify-between mb-2 gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-white">监控池 ETF 盘中主动资金流排行（Top 20）</h3>
+            <p class="text-[11px] text-[#8b98aa] mt-0.5">基于内外盘主动买卖差额 / 日内量价乘数实时测算（净流入前10 + 净流出前10）</p>
           </div>
-          <div id="chart-rt-etfs" class="w-full h-[360px]"></div>
+          <span class="rt-date-tag badge-tag bg-[#1c2030] text-[#a8b5c7] border border-[#2a2e39]">--</span>
         </div>
+        <div id="chart-rt-etfs" class="w-full h-[400px]"></div>
       </section>
 
       <!-- Realtime 3-in-1 Table -->
@@ -451,7 +475,7 @@
   </main>
 
   <footer class="zq-footer py-3.5 text-center text-xs">
-    Rooftop ETF Flow（天台ETF资金流）v0.2.1 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 仅供研究复盘，不构成投资建议
+    Rooftop ETF Flow（天台ETF资金流）v0.2.2 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 仅供研究复盘，不构成投资建议
   </footer>
 
   <!-- Modal 1: Single ETF Historical Trend -->

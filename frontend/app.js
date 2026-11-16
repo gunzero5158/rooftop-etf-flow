@@ -7,6 +7,7 @@
     search: "",
     sortKey: "net_flow",
     sortDesc: true,
+    pmQMode: "matrix", // "matrix" | "scatter"
     data: null,
 
     rtData: null,
@@ -14,6 +15,9 @@
     rtSearch: "",
     rtSortKey: "net_flow",
     rtSortDesc: true,
+    rtIndRankMode: "split", // "split" | "inflow" | "outflow"
+    rtConRankMode: "split",
+    rtQMode: "matrix", // "matrix" | "scatter"
     rtAutoRefresh: false,
     rtTimer: null,
   };
@@ -402,18 +406,30 @@
     );
   }
 
-  function renderHorizontalFlowChart(chartKey, domId, items, unit, market, labelFormatter) {
+  function renderHorizontalFlowChart(chartKey, domId, items, unit, market, labelFormatter, rankMode = "split", limit = 20) {
     const chart = getOrInitChart(chartKey, domId);
     if (!chart) return;
 
-    const sorted = [...items].sort((a, b) => b.net_flow - a.net_flow);
-    const topDown = [...sorted.slice(0, 8), ...sorted.slice(-8)].filter(
-      (v, i, arr) => arr.findIndex((x) => x.name === v.name) === i
-    );
-    topDown.sort((a, b) => a.net_flow - b.net_flow);
+    const sortedDesc = [...items].sort((a, b) => b.net_flow - a.net_flow);
+    let selected = [];
+    if (rankMode === "inflow") {
+      selected = sortedDesc.slice(0, limit);
+    } else if (rankMode === "outflow") {
+      selected = [...items].sort((a, b) => a.net_flow - b.net_flow).slice(0, limit);
+    } else {
+      if (sortedDesc.length <= limit) {
+        selected = sortedDesc;
+      } else {
+        const half = Math.floor(limit / 2);
+        selected = [...sortedDesc.slice(0, half), ...sortedDesc.slice(-half)].filter(
+          (v, i, arr) => arr.findIndex((x) => x.name === v.name) === i
+        );
+      }
+    }
+    selected.sort((a, b) => a.net_flow - b.net_flow);
 
-    const names = topDown.map((x) => x.name);
-    const values = topDown.map((x) => ({
+    const names = selected.map((x) => x.name);
+    const values = selected.map((x) => ({
       value: x.net_flow,
       itemStyle: { color: colorForVal(x.net_flow, market), borderRadius: x.net_flow >= 0 ? [0, 3, 3, 0] : [3, 0, 0, 3] },
     }));
@@ -426,9 +442,9 @@
           backgroundColor: "#111822",
           borderColor: "#263244",
           textStyle: { color: "#d8e1ea", fontSize: 12 },
-          formatter: (params) => labelFormatter(topDown[params[0].dataIndex], unit),
+          formatter: (params) => labelFormatter(selected[params[0].dataIndex], unit),
         },
-        grid: { left: 152, right: 56, top: 12, bottom: 24 },
+        grid: { left: 156, right: 58, top: 10, bottom: 22 },
         xAxis: {
           type: "value",
           splitLine: { lineStyle: { color: "rgba(148,163,184,0.1)" } },
@@ -444,7 +460,7 @@
           {
             type: "bar",
             data: values,
-            barMaxWidth: 16,
+            barMaxWidth: 15,
             label: {
               show: true,
               position: "right",
@@ -457,6 +473,119 @@
       },
       true
     );
+  }
+
+  function renderQuadrantMatrix(containerId, items, unit, market, options = {}) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const getPct = options.getPct || ((x) => x.pct_chg || 0);
+    const getSubTag = options.getSubTag || ((x) => x.kind || "");
+    const onItemClick = options.onItemClick || null;
+
+    const upColor = isPositiveRed(market) ? "#f23645" : "#089981";
+    const downColor = isPositiveRed(market) ? "#089981" : "#f23645";
+
+    const quadDefs = [
+      {
+        key: "逆势抄底",
+        title: "🧲 逆势抄底（价跌 + 净流入）",
+        subtitle: "板块调整但资金越跌越买 · 左侧承接",
+        border: "rgba(251, 191, 36, 0.45)",
+        accent: "#fbbf24",
+      },
+      {
+        key: "主线共振",
+        title: "🔥 主线共振（价涨 + 净流入）",
+        subtitle: "增量资金主动抢筹 · 强势主线强化",
+        border: isPositiveRed(market) ? "rgba(242, 54, 69, 0.5)" : "rgba(8, 153, 129, 0.5)",
+        accent: upColor,
+      },
+      {
+        key: "资金撤离",
+        title: "❄️ 资金撤离（价跌 + 净流出）",
+        subtitle: "弱势下跌伴随抛压 · 资金减仓避险",
+        border: isPositiveRed(market) ? "rgba(8, 153, 129, 0.45)" : "rgba(242, 54, 69, 0.45)",
+        accent: downColor,
+      },
+      {
+        key: "逢高兑现",
+        title: "💰 逢高兑现（价涨 + 净流出）",
+        subtitle: "价格上涨但主力/基民逢高止盈派发",
+        border: "rgba(167, 139, 250, 0.45)",
+        accent: "#c4b5fd",
+      },
+    ];
+
+    const grouped = {
+      逆势抄底: [],
+      主线共振: [],
+      资金撤离: [],
+      逢高兑现: [],
+    };
+    for (const item of items) {
+      const q = item.quadrant || "主线共振";
+      if (grouped[q]) grouped[q].push(item);
+    }
+
+    container.innerHTML = quadDefs
+      .map((qd) => {
+        const list = grouped[qd.key].sort((a, b) => Math.abs(b.net_flow) - Math.abs(a.net_flow));
+        const totalFlow = list.reduce((acc, x) => acc + (x.net_flow || 0), 0);
+        const maxAbs = Math.max(...list.map((x) => Math.abs(x.net_flow || 0)), 0.01);
+        const topList = list.slice(0, 15);
+
+        const rowsHtml =
+          topList.length === 0
+            ? `<div class="text-xs text-[#787b86] py-6 text-center">当前区间无该象限标的</div>`
+            : topList
+                .map((x) => {
+                  const pct = getPct(x);
+                  const subTag = getSubTag(x);
+                  const barWidth = Math.max(4, Math.min(100, (Math.abs(x.net_flow || 0) / maxAbs) * 100));
+                  const barColor = colorForVal(x.net_flow, market);
+                  const pctCls = classForVal(pct, market);
+                  const flowCls = classForVal(x.net_flow, market);
+                  const clickAttr = onItemClick ? `data-qcode="${escapeHtml(x.code)}" style="cursor:pointer;"` : "";
+                  return `
+                    <div class="q-item-row" ${clickAttr}>
+                      <div class="q-item-bar" style="width:${barWidth}%;background:${barColor};"></div>
+                      <div class="flex items-center gap-1.5 min-w-0 z-10">
+                        ${subTag ? `<span class="text-[10px] px-1 py-0.2 rounded bg-[#1c2030] text-[#8b98aa] shrink-0">${escapeHtml(subTag)}</span>` : ""}
+                        <span class="font-medium text-white truncate">${escapeHtml(x.name)}</span>
+                      </div>
+                      <div class="flex items-center gap-2.5 tabular-nums shrink-0 z-10">
+                        <span class="${pctCls} font-medium">${fmtSigned(pct, 2, "%")}</span>
+                        <span class="${flowCls} font-bold min-w-[74px] text-right">${fmtSigned(x.net_flow, 2, " " + unit)}</span>
+                      </div>
+                    </div>
+                  `;
+                })
+                .join("");
+
+        return `
+          <div class="quadrant-cell" style="border-color:${qd.border};border-top:2px solid ${qd.accent};">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="text-xs sm:text-[13px] font-bold text-white">${qd.title}</div>
+                <div class="text-[10.5px] text-[#8b98aa] mt-0.5">${qd.subtitle}</div>
+              </div>
+              <div class="text-right shrink-0 tabular-nums">
+                <div class="badge-tag bg-[#1c2030] text-[#d8e1ea] border border-[#2a2e39]">${list.length} 个</div>
+                <div class="text-[11px] font-bold mt-0.5 ${classForVal(totalFlow, market)}">${fmtSigned(totalFlow, 1, " " + unit)}</div>
+              </div>
+            </div>
+            <div class="quadrant-cell-list">${rowsHtml}</div>
+          </div>
+        `;
+      })
+      .join("");
+
+    if (onItemClick) {
+      container.querySelectorAll("[data-qcode]").forEach((el) => {
+        el.addEventListener("click", () => onItemClick(el.dataset.qcode));
+      });
+    }
   }
 
   function renderSectorsChart(d) {
@@ -477,8 +606,25 @@
   }
 
   function renderQuadrantChart(d) {
+    renderQuadrantMatrix("pm-quadrant-matrix", d.sector_rankings || [], d.unit, d.market, {
+      getPct: (x) => x.period_pct_chg || 0,
+      getSubTag: (x) => (x.category === "theme" ? "题材" : "行业"),
+      onItemClick: (code) => openDetailModal(code),
+    });
+
+    const matrixEl = document.getElementById("pm-quadrant-matrix");
+    const chartEl = document.getElementById("chart-quadrant");
+    if (state.pmQMode === "matrix") {
+      matrixEl.classList.remove("hidden");
+      chartEl.classList.add("hidden");
+      return;
+    }
+    matrixEl.classList.add("hidden");
+    chartEl.classList.remove("hidden");
+
     const chart = getOrInitChart("quadrant", "chart-quadrant");
     if (!chart) return;
+    chart.resize();
 
     const list = d.sector_rankings || [];
     const maxAum = Math.max(...list.map((x) => x.latest_aum || 1), 1);
@@ -541,6 +687,7 @@
           {
             type: "scatter",
             data: scatterData,
+            labelLayout: { hideOverlap: true },
             label: {
               show: true,
               position: "top",
@@ -782,7 +929,7 @@
 
     renderInsights(d, "rt-insights-grid", "text-[#fcd34d]");
 
-    // Realtime Charts
+    // Realtime Charts (Top 20 industries & concepts, 20 ETFs)
     renderHorizontalFlowChart(
       "rtIndustries",
       "chart-rt-industries",
@@ -795,7 +942,9 @@
         <div>主力净额：<b>${fmtSigned(x.net_flow, 2, " " + unit)}</b> (净占比 ${fmtSigned(x.net_ratio, 2, "%")})</div>
         <div>流入 / 流出：${fmtNum(x.inflow, 2)} / ${fmtNum(x.outflow, 2)} ${unit}</div>
         <div>领涨股：${escapeHtml(x.lead_stock || "--")} (${fmtSigned(x.lead_pct, 2, "%")})</div>
-      `
+      `,
+      state.rtIndRankMode,
+      20
     );
 
     renderHorizontalFlowChart(
@@ -810,7 +959,9 @@
         <div>主力净额：<b>${fmtSigned(x.net_flow, 2, " " + unit)}</b> (净占比 ${fmtSigned(x.net_ratio, 2, "%")})</div>
         <div>流入 / 流出：${fmtNum(x.inflow, 2)} / ${fmtNum(x.outflow, 2)} ${unit}</div>
         <div>领涨股：${escapeHtml(x.lead_stock || "--")} (${fmtSigned(x.lead_pct, 2, "%")})</div>
-      `
+      `,
+      state.rtConRankMode,
+      20
     );
 
     renderRtQuadrantChart(d);
@@ -827,20 +978,44 @@
         <div>盘中主动净买：<b>${fmtSigned(x.net_flow, 2, " " + unit)}</b> (净占比 ${fmtSigned(x.net_ratio, 2, "%")})</div>
         <div>实时成交额：${fmtNum(x.turnover, 2)} ${unit} · 量比：${fmtNum(x.vol_ratio, 2)}</div>
         <div>IOPV 折溢价：${fmtSigned(x.discount_pct, 2, "%")}</div>
-      `
+      `,
+      "split",
+      20
     );
 
     renderRealtimeTable();
   }
 
   function renderRtQuadrantChart(d) {
+    const pts = d.quadrant_points || [];
+    renderQuadrantMatrix("rt-quadrant-matrix", pts, d.unit, d.market, {
+      getPct: (x) => x.pct_chg || 0,
+      getSubTag: (x) => x.kind || "",
+    });
+
+    const matrixEl = document.getElementById("rt-quadrant-matrix");
+    const chartEl = document.getElementById("chart-rt-quadrant");
+    if (state.rtQMode === "matrix") {
+      matrixEl.classList.remove("hidden");
+      chartEl.classList.add("hidden");
+      return;
+    }
+    matrixEl.classList.add("hidden");
+    chartEl.classList.remove("hidden");
+
     const chart = getOrInitChart("rtQuadrant", "chart-rt-quadrant");
     if (!chart) return;
+    chart.resize();
 
-    const pts = d.quadrant_points || [];
-    const maxTurn = Math.max(...pts.map((x) => x.turnover || 1), 1);
+    const scatterPts = [
+      ...(d.industries || []).slice(0, 12).map((x) => ({ ...x, kind: "行业" })),
+      ...(d.industries || []).slice(-10).map((x) => ({ ...x, kind: "行业" })),
+      ...(d.concepts || []).slice(0, 12).map((x) => ({ ...x, kind: "题材" })),
+      ...(d.concepts || []).slice(-10).map((x) => ({ ...x, kind: "题材" })),
+    ];
+    const maxTurn = Math.max(...scatterPts.map((x) => x.turnover || 1), 1);
 
-    const scatterData = pts.map((x) => ({
+    const scatterData = scatterPts.map((x) => ({
       name: x.name,
       value: [x.pct_chg, x.net_flow, x.turnover, x.kind, x.quadrant, x.net_ratio],
       symbol: x.kind === "题材" ? "diamond" : "circle",
@@ -898,6 +1073,7 @@
           {
             type: "scatter",
             data: scatterData,
+            labelLayout: { hideOverlap: true },
             label: {
               show: true,
               position: "top",
@@ -1292,6 +1468,44 @@
     document.getElementById("rt-search-input").addEventListener("input", (e) => {
       state.rtSearch = e.target.value;
       renderRealtimeTable();
+    });
+
+    // Quadrant view switches (matrix vs scatter)
+    document.querySelectorAll("#pm-quadrant-mode .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#pm-quadrant-mode .seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.pmQMode = btn.dataset.qmode;
+        if (state.data) renderQuadrantChart(state.data);
+      });
+    });
+
+    document.querySelectorAll("#rt-quadrant-mode .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#rt-quadrant-mode .seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.rtQMode = btn.dataset.qmode;
+        if (state.rtData) renderRtQuadrantChart(state.rtData);
+      });
+    });
+
+    // Realtime Top-20 ranking mode switches (split 10+10 / inflow 20 / outflow 20)
+    document.querySelectorAll("#rt-ind-rank-mode .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#rt-ind-rank-mode .seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.rtIndRankMode = btn.dataset.rankmode;
+        if (state.rtData) renderRealtimeAll();
+      });
+    });
+
+    document.querySelectorAll("#rt-con-rank-mode .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#rt-con-rank-mode .seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.rtConRankMode = btn.dataset.rankmode;
+        if (state.rtData) renderRealtimeAll();
+      });
     });
 
     // Modals close
