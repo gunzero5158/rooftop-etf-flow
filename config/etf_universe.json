@@ -1,0 +1,106 @@
+{
+  "version": "0.1.0",
+  "CN": {
+    "currency": "RMB",
+    "flow_unit": "亿元",
+    "indices": [
+      {"code": "000001", "prefix": "sh", "name": "上证指数", "is_primary": true},
+      {"code": "000300", "prefix": "sh", "name": "沪深300", "is_primary": true},
+      {"code": "399006", "prefix": "sz", "name": "创业板指", "is_primary": false},
+      {"code": "000852", "prefix": "sh", "name": "中证1000", "is_primary": false},
+      {"code": "000688", "prefix": "sh", "name": "科创50", "is_primary": false}
+    ],
+    "etfs": [
+      {"code": "510300", "name": "沪深300ETF华泰柏瑞", "exchange": "SSE", "category": "broad", "cluster_id": "hs300", "cluster_name": "沪深300簇", "style": "large_core", "national_team_core": true},
+      {"code": "510310", "name": "沪深300ETF易方达", "exchange": "SSE", "category": "broad", "cluster_id": "hs300", "cluster_name": "沪深300簇", "style": "large_core", "national_team_core": true},
+      {"code": "510330", "name": "沪深300ETF华夏", "exchange": "SSE", "category": "broad", "cluster_id": "hs300", "cluster_name": "沪深300簇", "style": "large_core", "national_team_core": true},
+      {"code": "159919", "name": "沪深300ETF嘉实", "exchange": "SZSE", "category": "broad", "cluster_id": "hs300", "cluster_name": "沪深300簇", "style": "large_core", "national_team_core": true},
+
+      {"code": "510050", "name": "上证50ETF华夏", "exchange": "SSE", "category": "broad", "cluster_id": "sz50", "cluster_name": "上证50簇", "style": "large_value", "national_team_core": true},
+      {"code": "510100", "name": "上证50ETF易方达", "exchange": "SSE", "category": "broad", "cluster_id": "sz50", "cluster_name": "上证50簇", "style": "large_value", "national_team_core": true},
+
+      {"code": "510500", "name": "中证500ETF南方", "exchange": "SSE", "category": "broad", "cluster_id": "zz500_1000", "cluster_name": "中证500/1000簇", "style": "mid_small", "national_team_core": true},
+      {"code": "512100", "name": "中证1000ETF南方", "exchange": "SSE", "category": "broad", "cluster_id": "zz500_1000", "cluster_name": "中证500/1000簇", "style": "mid_small", "national_team_core": true},
+      {"code": "159845", "name": "中证1000ETF华夏", "exchange": "SZSE", "category": "broad", "cluster_id": "zz500_1000", "cluster_name": "中证500/1000簇", "style": "mid_small", "national_team_core": true},
+
+      {"code": "563360", "name": "A500ETF华泰柏瑞", "exchange": "SSE", "category": "broad", "cluster_id": "a500", "cluster_name": "中证A500簇", "style": "large_core", "national_team_core": false},
+      {"code": "159352", "name": "A500ETF南方", "exchange": "SZSE", "category": "broad", "cluster_id": "a500", "cluster_name": "中证A500簇", "style": "large_core", "national_team_core": false},
+      {"code": "159338", "name": "中证A500ETF国泰", "exchange": "SZSE", "category": "broad", "cluster_id": "a500", "cluster_name": "中证A500簇", "style": "large_core", "national_team_core": false},
+      {"code": "159361", "name": "A500ETF易方达", "exchange": "SZSE", "category": "broad", "cluster_id": "a500", "cluster_name": "中证A500簇", "style": "large_core", "national_team_core": false},
+
+      {"code": "588000", "name": "科创50ETF华夏", "exchange": "SSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
+      {"code": "588080", "name": "科创板50ETF易方达", "exchange": "SSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
+      {"code": "159915", "name": "创业板ETF易方达", "exchange": "SZSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
+      {"code": "159949", "name": "创业板50ETF华安", "exchange": "SZSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
+
+      {"code": "563300", "name": "中证2000ETF华泰柏瑞", "exchange": "SSE", "category": "broad", "cluster_id": "zz2000", "cluster_name": "中证2000微盘簇", "style": "micro_small", "national_team_core": false},
+
+      {"code": "512480", "name": "半导体ETF", "exchange": "SSE", "category": "sector", "cluster_id": "tech_growth", "cluster_name": "科技与硬核成长", "style": "growth", "national_team_core": false},
+      {"code": "588200", "name": "科创芯片ETF", "exchange": "SSE", "category": "theme", "cluster_id": "tech_growth", "cluster_name": "科技与硬核成长", "style": "growth", "national_team_core": false},
+      {"code": "159819", "name": "人工智能ETF易方达", "exchange": "SZSE", "category": "theme", "cluster_id": "tech_growth", "cluster_name": "科技与硬核成长", "style": "growth", "national_team_core": false},
+      {"code": "515880", "name": "通信ETF", "exchange": "SSE", "category": "sector", "cluster_id": "tech_growth", "cluster_name": "科技与硬核成长", "style": "growth", "national_team_core": false},
+      {"code": "159530", "name": "机器人ETF易方达", "exchange": "SZSE", "category": "theme", "cluster_id": "tech_growth", "cluster_name": "科技与硬核成长", "style": "growth", "national_team_core": false},
+
+      {"code": "512880", "name": "证券ETF", "exchange": "SSE", "category": "sector", "cluster_id": "finance", "cluster_name": "大金融与券商", "style": "cyclical", "national_team_core": false},
+      {"code": "512000", "name": "券商ETF", "exchange": "SSE", "category": "sector", "cluster_id": "finance", "cluster_name": "大金融与券商", "style": "cyclical", "national_team_core": false},
+      {"code": "159851", "name": "金融科技ETF华宝", "exchange": "SZSE", "category": "theme", "cluster_id": "finance", "cluster_name": "大金融与券商", "style": "growth", "national_team_core": false},
+
+      {"code": "512890", "name": "红利低波ETF", "exchange": "SSE", "category": "sector", "cluster_id": "dividend_defensive", "cluster_name": "高股息与防御", "style": "defensive", "national_team_core": false},
+      {"code": "512800", "name": "银行ETF", "exchange": "SSE", "category": "sector", "cluster_id": "dividend_defensive", "cluster_name": "高股息与防御", "style": "defensive", "national_team_core": false},
+
+      {"code": "515790", "name": "光伏ETF", "exchange": "SSE", "category": "sector", "cluster_id": "new_energy_mfg", "cluster_name": "新能源与高端制造", "style": "cyclical", "national_team_core": false},
+      {"code": "159755", "name": "电池ETF广发", "exchange": "SZSE", "category": "sector", "cluster_id": "new_energy_mfg", "cluster_name": "新能源与高端制造", "style": "cyclical", "national_team_core": false},
+      {"code": "512660", "name": "军工ETF", "exchange": "SSE", "category": "sector", "cluster_id": "new_energy_mfg", "cluster_name": "新能源与高端制造", "style": "growth", "national_team_core": false},
+
+      {"code": "512010", "name": "医药ETF", "exchange": "SSE", "category": "sector", "cluster_id": "consumer_pharma", "cluster_name": "消费与医药", "style": "defensive", "national_team_core": false},
+      {"code": "512170", "name": "医疗ETF", "exchange": "SSE", "category": "sector", "cluster_id": "consumer_pharma", "cluster_name": "消费与医药", "style": "defensive", "national_team_core": false},
+      {"code": "512690", "name": "酒ETF", "exchange": "SSE", "category": "sector", "cluster_id": "consumer_pharma", "cluster_name": "消费与医药", "style": "consumer", "national_team_core": false},
+      {"code": "159928", "name": "消费ETF汇添富", "exchange": "SZSE", "category": "sector", "cluster_id": "consumer_pharma", "cluster_name": "消费与医药", "style": "consumer", "national_team_core": false},
+
+      {"code": "513130", "name": "恒生科技ETF", "exchange": "SSE", "category": "macro", "cluster_id": "cross_macro", "cluster_name": "跨境与避险锚", "style": "cross_border", "national_team_core": false},
+      {"code": "518880", "name": "黄金ETF", "exchange": "SSE", "category": "macro", "cluster_id": "cross_macro", "cluster_name": "跨境与避险锚", "style": "commodity", "national_team_core": false}
+    ]
+  },
+  "US": {
+    "currency": "USD",
+    "flow_unit": "百万美元",
+    "indices": [
+      {"code": "^GSPC", "prefix": "", "name": "标普500", "is_primary": true},
+      {"code": "^IXIC", "prefix": "", "name": "纳斯达克综合", "is_primary": true},
+      {"code": "^DJI", "prefix": "", "name": "道琼斯工业", "is_primary": false},
+      {"code": "^RUT", "prefix": "", "name": "罗素2000", "is_primary": false}
+    ],
+    "etfs": [
+      {"code": "SPY", "name": "SPDR标普500ETF", "exchange": "NYSE", "category": "broad", "cluster_id": "sp500", "cluster_name": "标普500簇", "style": "large_core", "national_team_core": true},
+      {"code": "VOO", "name": "Vanguard标普500ETF", "exchange": "NYSE", "category": "broad", "cluster_id": "sp500", "cluster_name": "标普500簇", "style": "large_core", "national_team_core": true},
+      {"code": "IVV", "name": "iShares标普500ETF", "exchange": "NYSE", "category": "broad", "cluster_id": "sp500", "cluster_name": "标普500簇", "style": "large_core", "national_team_core": true},
+
+      {"code": "QQQ", "name": "Invesco纳斯达克100ETF", "exchange": "NASDAQ", "category": "broad", "cluster_id": "nasdaq100", "cluster_name": "纳指100簇", "style": "growth", "national_team_core": false},
+      {"code": "QQQM", "name": "Invesco纳指100迷你ETF", "exchange": "NASDAQ", "category": "broad", "cluster_id": "nasdaq100", "cluster_name": "纳指100簇", "style": "growth", "national_team_core": false},
+
+      {"code": "IWM", "name": "iShares罗素2000小盘ETF", "exchange": "NYSE", "category": "broad", "cluster_id": "small_dow", "cluster_name": "中小盘与道指簇", "style": "mid_small", "national_team_core": false},
+      {"code": "DIA", "name": "SPDR道琼斯工业ETF", "exchange": "NYSE", "category": "broad", "cluster_id": "small_dow", "cluster_name": "中小盘与道指簇", "style": "large_value", "national_team_core": false},
+
+      {"code": "TLT", "name": "20+年期美国国债ETF", "exchange": "NASDAQ", "category": "macro", "cluster_id": "us_macro", "cluster_name": "美股宏观流动性锚", "style": "bond", "national_team_core": false},
+      {"code": "GLD", "name": "SPDR黄金ETF", "exchange": "NYSE", "category": "macro", "cluster_id": "us_macro", "cluster_name": "美股宏观流动性锚", "style": "commodity", "national_team_core": false},
+
+      {"code": "XLK", "name": "科技行业精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "growth", "national_team_core": false},
+      {"code": "XLF", "name": "金融行业精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "cyclical", "national_team_core": false},
+      {"code": "XLV", "name": "医疗健康精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "defensive", "national_team_core": false},
+      {"code": "XLE", "name": "能源行业精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "cyclical", "national_team_core": false},
+      {"code": "XLY", "name": "可选消费精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "consumer", "national_team_core": false},
+      {"code": "XLP", "name": "必选消费精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "defensive", "national_team_core": false},
+      {"code": "XLI", "name": "工业行业精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "cyclical", "national_team_core": false},
+      {"code": "XLU", "name": "公用事业精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "defensive", "national_team_core": false},
+      {"code": "XLB", "name": "原材料行业精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "cyclical", "national_team_core": false},
+      {"code": "XLRE", "name": "房地产行业精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "defensive", "national_team_core": false},
+      {"code": "XLC", "name": "通信服务精选ETF", "exchange": "NYSE", "category": "sector", "cluster_id": "spdr_sectors", "cluster_name": "SPDR 11大行业", "style": "growth", "national_team_core": false},
+
+      {"code": "SMH", "name": "VanEck半导体ETF", "exchange": "NASDAQ", "category": "theme", "cluster_id": "us_themes", "cluster_name": "美股高弹性主题", "style": "growth", "national_team_core": false},
+      {"code": "SOXX", "name": "iShares半导体ETF", "exchange": "NASDAQ", "category": "theme", "cluster_id": "us_themes", "cluster_name": "美股高弹性主题", "style": "growth", "national_team_core": false},
+      {"code": "IGV", "name": "iShares北美软件ETF", "exchange": "NYSE", "category": "theme", "cluster_id": "us_themes", "cluster_name": "美股高弹性主题", "style": "growth", "national_team_core": false},
+      {"code": "XBI", "name": "SPDR生物科技ETF", "exchange": "NYSE", "category": "theme", "cluster_id": "us_themes", "cluster_name": "美股高弹性主题", "style": "growth", "national_team_core": false},
+      {"code": "ARKK", "name": "ARK创新颠覆ETF", "exchange": "NYSE", "category": "theme", "cluster_id": "us_themes", "cluster_name": "美股高弹性主题", "style": "growth", "national_team_core": false}
+    ]
+  }
+}
