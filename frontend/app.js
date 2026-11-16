@@ -551,7 +551,7 @@
                     <div class="q-item-row" ${clickAttr}>
                       <div class="q-item-bar" style="width:${barWidth}%;background:${barColor};"></div>
                       <div class="flex items-center gap-1.5 min-w-0 z-10">
-                        ${subTag ? `<span class="text-[10px] px-1 py-0.2 rounded bg-[#1c2030] text-[#8b98aa] shrink-0">${escapeHtml(subTag)}</span>` : ""}
+                        ${subTag ? `<span class="text-[10px] px-1.5 py-0.5 leading-none rounded bg-[#1c2030] text-[#8b98aa] shrink-0">${escapeHtml(subTag)}</span>` : ""}
                         <span class="font-medium text-white truncate">${escapeHtml(x.name)}</span>
                       </div>
                       <div class="flex items-center gap-2.5 tabular-nums shrink-0 z-10">
