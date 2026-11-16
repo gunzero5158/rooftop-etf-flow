@@ -106,6 +106,10 @@
         ? `${d.flow_start_date} ~ ${d.flow_end_date} (${d.period_label})`
         : "--";
     document.getElementById("lbl-price-date").textContent = d.latest_price_date || "--";
+    const pmPill = document.getElementById("hero-pm-date-pill");
+    if (pmPill) {
+      pmPill.textContent = d.flow_end_date ? `份额结算至 ${d.flow_end_date}` : "官方份额结算";
+    }
 
     document.getElementById("unit-badge-1").textContent = d.unit;
     document.getElementById("unit-badge-2").textContent = d.unit;
@@ -424,7 +428,7 @@
           textStyle: { color: "#d8e1ea", fontSize: 12 },
           formatter: (params) => labelFormatter(topDown[params[0].dataIndex], unit),
         },
-        grid: { left: 124, right: 56, top: 12, bottom: 24 },
+        grid: { left: 152, right: 56, top: 12, bottom: 24 },
         xAxis: {
           type: "value",
           splitLine: { lineStyle: { color: "rgba(148,163,184,0.1)" } },
@@ -636,6 +640,82 @@
     }
   }
 
+  function updateHeroRealtimeStatusPill(sessionInfo) {
+    const pill = document.getElementById("hero-rt-status-pill");
+    if (!pill || !sessionInfo) return;
+    pill.textContent = sessionInfo.badge_text || "盘中实时";
+    if (sessionInfo.is_live) {
+      pill.className = "badge-tag bg-[#089981]/20 text-[#5eead4] border border-[#089981]/50";
+    } else if (sessionInfo.is_previous_day) {
+      pill.className = "badge-tag bg-[#fbbf24]/20 text-[#fcd34d] border border-[#fbbf24]/50";
+    } else {
+      pill.className = "badge-tag bg-[#2dd4bf]/15 text-[#5eead4] border border-[#2dd4bf]/45";
+    }
+  }
+
+  async function preloadRealtimeBadge() {
+    try {
+      const res = await fetch(`/api/v1/etf-flow/realtime?market=${state.market}&force=false`);
+      if (!res.ok) return;
+      const rt = await res.json();
+      if (!state.rtData || state.rtData.market === state.market) {
+        state.rtData = rt;
+      }
+      updateHeroRealtimeStatusPill(rt.session);
+    } catch {
+      // Ignore background preload failures
+    }
+  }
+
+  function renderSessionBanner(sessionInfo) {
+    const banner = document.getElementById("rt-session-banner");
+    const badge = document.getElementById("rt-banner-badge");
+    const title = document.getElementById("rt-banner-title");
+    const desc = document.getElementById("rt-banner-desc");
+    const chip = document.getElementById("rt-banner-date-chip");
+    if (!banner || !sessionInfo) return;
+
+    title.textContent = sessionInfo.banner_title || "--";
+    desc.textContent = sessionInfo.banner_desc || "--";
+    chip.textContent = `数据所属交易日：${sessionInfo.data_date} (${sessionInfo.weekday})`;
+
+    if (sessionInfo.is_live) {
+      banner.className = "session-banner session-banner-live";
+      badge.className = "badge-tag bg-[#10b981]/25 text-[#6ee7b7] border border-[#10b981]/60 text-xs px-2.5 py-1";
+      badge.textContent = "● 盘中实时交易中";
+      chip.className = "text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#0b1018]/80 border border-[#10b981]/50 text-[#6ee7b7] tabular-nums whitespace-nowrap";
+    } else if (sessionInfo.is_previous_day) {
+      banner.className = "session-banner session-banner-prev";
+      badge.className = "badge-tag bg-[#fbbf24]/25 text-[#fcd34d] border border-[#fbbf24]/60 text-xs px-2.5 py-1";
+      badge.textContent = "⏸ 非交易时段 · 上一交易日数据";
+      chip.className = "text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#0b1018]/80 border border-[#fbbf24]/55 text-[#fcd34d] tabular-nums whitespace-nowrap";
+    } else {
+      banner.className = "session-banner session-banner-closed";
+      badge.className = "badge-tag bg-[#2dd4bf]/20 text-[#5eead4] border border-[#2dd4bf]/50 text-xs px-2.5 py-1";
+      badge.textContent = "⏹ 当期已收盘 · 收盘定格";
+      chip.className = "text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#0b1018]/80 border border-[#2dd4bf]/45 text-[#5eead4] tabular-nums whitespace-nowrap";
+    }
+
+    document.querySelectorAll(".rt-date-tag").forEach((el) => {
+      el.textContent = sessionInfo.short_tag || "--";
+      if (sessionInfo.is_previous_day) {
+        el.className = "rt-date-tag badge-tag bg-[#fbbf24]/15 text-[#fcd34d] border border-[#fbbf24]/40";
+      } else if (sessionInfo.is_live) {
+        el.className = "rt-date-tag badge-tag bg-[#10b981]/15 text-[#6ee7b7] border border-[#10b981]/40";
+      } else {
+        el.className = "rt-date-tag badge-tag bg-[#2dd4bf]/15 text-[#5eead4] border border-[#2dd4bf]/35";
+      }
+    });
+
+    if (!state.rtAutoRefresh) {
+      const autoLabel = document.getElementById("rt-auto-label");
+      if (autoLabel) {
+        autoLabel.textContent = sessionInfo.is_live ? "自动刷新: 关" : "休市定格中 (30s刷: 关)";
+      }
+    }
+    updateHeroRealtimeStatusPill(sessionInfo);
+  }
+
   function renderRealtimeAll() {
     const d = state.rtData;
     if (!d) return;
@@ -645,6 +725,9 @@
     document.getElementById("rt-unit-1").textContent = d.unit;
     document.getElementById("rt-unit-2").textContent = d.unit;
     document.getElementById("rt-unit-3").textContent = d.unit;
+    if (d.session) {
+      renderSessionBanner(d.session);
+    }
 
     // Indices
     const idxContainer = document.getElementById("rt-indices-strip");
@@ -981,10 +1064,26 @@
 
   function switchViewMode(view) {
     state.viewMode = view;
-    document.querySelectorAll("#view-mode-switch .seg-btn").forEach((b) => {
-      b.classList.remove("active", "active-gold");
-      if (b.dataset.view === view) {
-        b.classList.add(view === "realtime" ? "active-gold" : "active");
+    document.querySelectorAll("#view-mode-switch .mode-hero-card").forEach((card) => {
+      card.classList.remove("active-teal", "active-gold");
+      const pill = card.querySelector(".mode-state-pill");
+      if (card.dataset.view === view) {
+        if (view === "realtime") {
+          card.classList.add("active-gold");
+          if (pill) {
+            pill.textContent = "● 当前视图";
+            pill.className = "mode-state-pill badge-tag bg-[#fbbf24]/20 text-[#fcd34d] border border-[#fbbf24]/50";
+          }
+        } else {
+          card.classList.add("active-teal");
+          if (pill) {
+            pill.textContent = "● 当前视图";
+            pill.className = "mode-state-pill badge-tag bg-[#2dd4bf]/20 text-[#5eead4] border border-[#2dd4bf]/50";
+          }
+        }
+      } else if (pill) {
+        pill.textContent = "点击切换";
+        pill.className = "mode-state-pill badge-tag bg-[#263244] text-[#8b98aa] border border-[#334155]";
       }
     });
 
@@ -997,6 +1096,7 @@
       if (!state.rtData || state.rtData.market !== state.market) {
         loadRealtime(false).then(() => resizeAllCharts());
       } else {
+        renderRealtimeAll();
         resizeAllCharts();
       }
     } else {
@@ -1019,6 +1119,7 @@
       loadRealtime(false);
     } else {
       loadDashboard();
+      preloadRealtimeBadge();
     }
   }
 
@@ -1104,8 +1205,8 @@
   }
 
   function wireEvents() {
-    document.querySelectorAll("#view-mode-switch .seg-btn").forEach((btn) => {
-      btn.addEventListener("click", () => switchViewMode(btn.dataset.view));
+    document.querySelectorAll("#view-mode-switch .mode-hero-card").forEach((card) => {
+      card.addEventListener("click", () => switchViewMode(card.dataset.view));
     });
 
     document.querySelectorAll(".market-switch-group .seg-btn").forEach((btn) => {
@@ -1167,7 +1268,8 @@
         }, 30000);
       } else {
         dot.className = "w-2 h-2 rounded-full bg-[#787b86]";
-        label.textContent = "自动刷新: 关";
+        const isLive = state.rtData?.session?.is_live;
+        label.textContent = isLive ? "自动刷新: 关" : "休市定格中 (30s刷: 关)";
         btn.classList.remove("border-[#2dd4bf]");
         if (state.rtTimer) {
           clearInterval(state.rtTimer);
@@ -1290,4 +1392,5 @@
 
   wireEvents();
   loadDashboard();
+  preloadRealtimeBadge();
 })();

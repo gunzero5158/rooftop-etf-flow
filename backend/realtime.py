@@ -7,6 +7,7 @@ import threading
 import time
 from io import StringIO
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
@@ -535,6 +536,141 @@ def _get_us_realtime_all() -> tuple[
     return indices_out, industries, concepts, etfs_out, latest_time
 
 
+WEEKDAY_ZH = ("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+
+
+def _evaluate_market_session_status(market: str, quote_time: str) -> dict[str, Any]:
+    """Determine market session state and whether displayed realtime data is from the previous trading day."""
+    tz = ZoneInfo("Asia/Shanghai") if market == "CN" else ZoneInfo("America/New_York")
+    now_local = dt.datetime.now(tz)
+    today_local = now_local.strftime("%Y-%m-%d")
+    hhmm = now_local.hour * 100 + now_local.minute
+    is_weekday = now_local.weekday() < 5
+
+    data_date = quote_time[:10] if quote_time and len(quote_time) >= 10 else today_local
+    try:
+        parsed_dt = dt.datetime.strptime(data_date, "%Y-%m-%d")
+        wd = WEEKDAY_ZH[parsed_dt.weekday()]
+    except ValueError:
+        wd = ""
+        data_date = today_local
+
+    short_date = data_date[5:]
+
+    if market == "CN":
+        if data_date != today_local:
+            if is_weekday and hhmm < 930:
+                return {
+                    "state": "PRE_MARKET_PREV_DAY",
+                    "is_live": False,
+                    "is_previous_day": True,
+                    "data_date": data_date,
+                    "weekday": wd,
+                    "badge_text": f"⏸ 盘前未开盘 · 上一交易日 {short_date}({wd})",
+                    "short_tag": f"上一交易日 {data_date} ({wd}) 收盘定格",
+                    "banner_title": f"A股盘前尚未开盘 — 当前展示为上一交易日【{data_date} {wd}】收盘定格资金流",
+                    "banner_desc": "A股交易时段为北京时间 09:30-11:30、13:00-15:00。开盘集合竞价结束后将自动切换为今日盘中实时数据。",
+                }
+            return {
+                "state": "CLOSED_PREV_DAY",
+                "is_live": False,
+                "is_previous_day": True,
+                "data_date": data_date,
+                "weekday": wd,
+                "badge_text": f"⏸ 休市中 · 上一交易日 {short_date}({wd})",
+                "short_tag": f"上一交易日 {data_date} ({wd}) 收盘定格",
+                "banner_title": f"当前A股休市中 — 当前展示为上一交易日【{data_date} {wd}】全天收盘定格资金流",
+                "banner_desc": "非交易时段行情静止，所有行业、题材与ETF主动资金流均为上一交易日 15:00 收盘最终定格数据。",
+            }
+
+        if is_weekday and ((925 <= hhmm <= 1130) or (1300 <= hhmm <= 1500)):
+            return {
+                "state": "LIVE_TRADING",
+                "is_live": True,
+                "is_previous_day": False,
+                "data_date": data_date,
+                "weekday": wd,
+                "badge_text": f"● 盘中交易中 · {short_date}({wd})实时",
+                "short_tag": f"今日 {data_date} ({wd}) 盘中实时",
+                "banner_title": f"A股盘中交易进行中【{data_date} {wd}】— 实时追踪行业、题材与场内ETF主动资金流",
+                "banner_desc": "支持每 30 秒自动刷新；分行业/题材统计日内主力资金，监控池ETF基于内外盘主动买卖差额实时测算。",
+            }
+        if is_weekday and (1130 < hhmm < 1300):
+            return {
+                "state": "LUNCH_BREAK",
+                "is_live": False,
+                "is_previous_day": False,
+                "data_date": data_date,
+                "weekday": wd,
+                "badge_text": f"⏸ 午间休市 · {short_date}({wd})早盘定格",
+                "short_tag": f"今日 {data_date} ({wd}) 早盘定格",
+                "banner_title": f"A股午间休市中【{data_date} {wd}】— 展示截至 11:30 早盘收盘资金流",
+                "banner_desc": "13:00 午盘开市后将继续实时跳动更新。",
+            }
+        return {
+            "state": "POST_CLOSE_TODAY",
+            "is_live": False,
+            "is_previous_day": False,
+            "data_date": data_date,
+            "weekday": wd,
+            "badge_text": f"⏹ 今日已收盘 · {short_date}({wd})收盘定格",
+            "short_tag": f"今日 {data_date} ({wd}) 收盘定格",
+            "banner_title": f"A股今日已收盘 — 当前展示为今日【{data_date} {wd}】15:00 全天收盘定格资金流",
+            "banner_desc": "今日盘中交易已结束（数据定格于 15:00），官方一级市场申赎份额预计于晚间至次日早间公布，可在「盘后份额流向」页核验。",
+        }
+
+    # US Market (America/New_York)
+    ny_clock = now_local.strftime("%m-%d %H:%M %Z")
+    if data_date != today_local:
+        if is_weekday and hhmm < 930:
+            return {
+                "state": "PRE_MARKET_PREV_DAY",
+                "is_live": False,
+                "is_previous_day": True,
+                "data_date": data_date,
+                "weekday": wd,
+                "badge_text": f"⏸ 美股未开盘 · 上一交易日 {short_date}({wd})",
+                "short_tag": f"上一交易日 {data_date} ({wd}) 收盘定格",
+                "banner_title": f"当前美股尚未开盘 — 页面展示为上一交易日【{data_date} {wd}】全天收盘定格资金流",
+                "banner_desc": f"美股常规交易时段为美东 09:30-16:00（当前美东 {ny_clock}）。此时所有板块与ETF均为上一交易日收盘最终汇总。",
+            }
+        return {
+            "state": "CLOSED_PREV_DAY",
+            "is_live": False,
+            "is_previous_day": True,
+            "data_date": data_date,
+            "weekday": wd,
+            "badge_text": f"⏸ 美股休市中 · 上一交易日 {short_date}({wd})",
+            "short_tag": f"上一交易日 {data_date} ({wd}) 收盘定格",
+            "banner_title": f"当前美股休市中 — 页面展示为上一交易日【{data_date} {wd}】全天收盘定格资金流",
+            "banner_desc": f"当前为美股休市时段（美东 {ny_clock}），页面数值为上一交易日 16:00 收盘最终定格数据。",
+        }
+
+    if is_weekday and (930 <= hhmm <= 1600):
+        return {
+            "state": "LIVE_TRADING",
+            "is_live": True,
+            "is_previous_day": False,
+            "data_date": data_date,
+            "weekday": wd,
+            "badge_text": f"● 美股交易中 · {short_date}({wd})实时",
+            "short_tag": f"当期 {data_date} ({wd}) 盘中实时",
+            "banner_title": f"美股盘中交易进行中【{data_date} {wd}】— 实时追踪16大行业与16大热门题材",
+            "banner_desc": f"当前美东时间 {ny_clock}，支持每 30 秒自动刷新估算日内资金流向。",
+        }
+    return {
+        "state": "POST_CLOSE_TODAY",
+        "is_live": False,
+        "is_previous_day": False,
+        "data_date": data_date,
+        "weekday": wd,
+        "badge_text": f"⏹ 美股已收盘 · {short_date}({wd})收盘定格",
+        "short_tag": f"当期 {data_date} ({wd}) 收盘定格",
+        "banner_title": f"美股当期交易日已收盘 — 当前展示为【{data_date} {wd}】16:00 收盘定格资金流",
+        "banner_desc": f"当前美东时间 {ny_clock}，当期盘中已结束，数值已定格为该交易日全天收盘汇总。",
+    }
+
+
 def _build_realtime_insights(
     market: str,
     unit: str,
@@ -542,6 +678,7 @@ def _build_realtime_insights(
     industries: list[dict[str, Any]],
     concepts: list[dict[str, Any]],
     etfs: list[dict[str, Any]],
+    session_info: dict[str, Any],
 ) -> list[dict[str, str]]:
     """Build four concise intraday realtime commentary blocks."""
     idx_text = "；".join(
@@ -572,35 +709,36 @@ def _build_realtime_insights(
     etf_detail = ""
     if top_etf and bot_etf:
         etf_detail = (
-            f"盘中净买入居首的是 **{top_etf['name']}**（{top_etf['net_flow']:+.2f}{unit}，"
+            f"主动净买入居首的是 **{top_etf['name']}**（{top_etf['net_flow']:+.2f}{unit}，"
             f"涨跌 {top_etf['pct_chg']:+.2f}%）；承压居前的是 **{bot_etf['name']}**（{bot_etf['net_flow']:+.2f}{unit}）。"
         )
 
     method_note = (
-        "行业/概念为同花顺/新浪实时主力净额；场内ETF采用内外盘主动买卖额口径"
+        "行业/概念为同花顺/新浪主力净额；场内ETF采用内外盘主动买卖额口径"
         if market == "CN"
-        else "基于腾讯实时行情与日内量价资金流乘数（MFM × 成交额）实时估算"
+        else "基于腾讯实时行情与日内量价资金流乘数（MFM × 成交额）测算"
     )
+    tag = session_info.get("short_tag", "")
 
     return [
         {
-            "title": "大盘实时走势与资金广度",
+            "title": f"大盘走势与资金广度（{tag}）",
             "body": (
-                f"{idx_text}。实时资金广度：行业净流入 **{ind_up_cnt}/{len(industries)}** 个，"
+                f"{idx_text}。资金广度：行业净流入 **{ind_up_cnt}/{len(industries)}** 个，"
                 f"概念题材净流入 **{con_up_cnt}/{len(concepts)}** 个（{method_note}）。"
             ),
         },
         {
-            "title": "分行业实时资金主线",
+            "title": "分行业资金主线",
             "body": f"主力净流入前三行业：{ind_in or '暂无'}；净流出前三行业：{ind_out or '暂无'}。",
         },
         {
-            "title": "分题材 / 概念实时热点",
+            "title": "分题材 / 概念热点",
             "body": f"资金抢筹前三题材：{con_in or '暂无'}；资金撤离前三题材：{con_out or '暂无'}。",
         },
         {
-            "title": "监控池 ETF 盘中主动资金动向",
-            "body": f"宽基 ETF 盘中主动净流向合计 **{broad_sum:+.2f}{unit}**。{etf_detail}",
+            "title": "监控池 ETF 主动资金动向",
+            "body": f"宽基 ETF 主动净流向合计 **{broad_sum:+.2f}{unit}**。{etf_detail}",
         },
     ]
 
@@ -615,7 +753,11 @@ def get_realtime_flow_data(market: str = "CN", force: bool = False) -> dict[str,
     with _CACHE_LOCK:
         cached = _CACHE.get(market)
         if not force and cached and (now_ts - cached[0] < CACHE_TTL_SECONDS):
-            return cached[1]
+            payload_cached = dict(cached[1])
+            payload_cached["session"] = _evaluate_market_session_status(
+                market, payload_cached.get("quote_time", "")
+            )
+            return payload_cached
 
     if market == "CN":
         unit = "亿元"
@@ -630,6 +772,8 @@ def get_realtime_flow_data(market: str = "CN", force: bool = False) -> dict[str,
 
     if not quote_time:
         quote_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    session_info = _evaluate_market_session_status(market, quote_time)
 
     total_etf_active = round(sum(e["net_flow"] for e in etfs), 2)
     total_broad_active = round(sum(e["net_flow"] for e in etfs if e["category"] == "broad"), 2)
@@ -657,6 +801,7 @@ def get_realtime_flow_data(market: str = "CN", force: bool = False) -> dict[str,
         "source": source,
         "quote_time": quote_time,
         "fetched_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "session": session_info,
         "indices": indices,
         "summary": {
             "top_industry": industries[0] if industries else None,
@@ -670,7 +815,9 @@ def get_realtime_flow_data(market: str = "CN", force: bool = False) -> dict[str,
             "concept_in_count": con_in_cnt,
             "concept_total": len(concepts),
         },
-        "insights": _build_realtime_insights(market, unit, indices, industries, concepts, etfs),
+        "insights": _build_realtime_insights(
+            market, unit, indices, industries, concepts, etfs, session_info
+        ),
         "industries": industries,
         "concepts": concepts,
         "quadrant_points": dedup_qp,
