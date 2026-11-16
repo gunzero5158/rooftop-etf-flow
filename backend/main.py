@@ -20,6 +20,7 @@ from backend.analyzer import (
 from backend.db import BASE_DIR, init_db, load_universe, save_universe, sync_meta_from_universe
 from backend.fetcher_cn import sync_cn_data
 from backend.fetcher_us import sync_us_data
+from backend.realtime import get_realtime_flow_data
 
 FRONTEND_DIR = BASE_DIR / "frontend"
 REPORT_PATH = BASE_DIR / "docs" / "reports" / "latest_analysis_report.md"
@@ -74,6 +75,15 @@ def api_dashboard(
 ) -> dict:
     """Return aggregated dashboard analytics for a market and period."""
     return get_dashboard_data(market=market, period=period)
+
+
+@app.get("/api/v1/etf-flow/realtime")
+def api_realtime(
+    market: Literal["CN", "US"] = Query(default="CN"),
+    force: bool = Query(default=False),
+) -> dict:
+    """Return realtime intraday sector, theme, and monitored ETF fund flow data."""
+    return get_realtime_flow_data(market=market, force=force)
 
 
 @app.get("/api/v1/etf-flow/etf/{market}/{code}")

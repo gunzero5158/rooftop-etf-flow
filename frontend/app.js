@@ -1,5 +1,6 @@
 (() => {
   const state = {
+    viewMode: "postmarket", // "postmarket" | "realtime"
     market: "CN",
     period: "5d",
     categoryFilter: "all",
@@ -7,6 +8,14 @@
     sortKey: "net_flow",
     sortDesc: true,
     data: null,
+
+    rtData: null,
+    rtTab: "industries", // "industries" | "concepts" | "etfs"
+    rtSearch: "",
+    rtSortKey: "net_flow",
+    rtSortDesc: true,
+    rtAutoRefresh: false,
+    rtTimer: null,
   };
 
   const charts = {
@@ -15,10 +24,13 @@
     sectors: null,
     quadrant: null,
     detail: null,
+    rtIndustries: null,
+    rtConcepts: null,
+    rtQuadrant: null,
+    rtEtfs: null,
   };
 
   function isPositiveRed(market) {
-    // CN convention: red = inflow / up, green = outflow / down; US convention: green = up, red = down
     return market === "CN";
   }
 
@@ -57,7 +69,7 @@
   }
 
   function renderMarkdownBold(text) {
-    return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong class="text-slate-100 font-semibold">$1</strong>');
+    return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>');
   }
 
   function getOrInitChart(key, domId) {
@@ -69,6 +81,14 @@
     }
     return charts[key];
   }
+
+  function resizeAllCharts() {
+    Object.values(charts).forEach((c) => {
+      if (c) c.resize();
+    });
+  }
+
+  // ==================== POST-MARKET DASHBOARD ====================
 
   async function loadDashboard() {
     const res = await fetch(`/api/v1/etf-flow/dashboard?market=${state.market}&period=${state.period}`);
@@ -94,7 +114,7 @@
 
     renderIndices(d);
     renderKpis(d);
-    renderInsights(d);
+    renderInsights(d, "insights-grid");
     renderTimeSeriesChart(d);
     renderClustersChart(d);
     renderSectorsChart(d);
@@ -111,14 +131,14 @@
         return `
           <div class="card-panel px-3.5 py-3">
             <div class="flex items-center justify-between text-xs">
-              <span class="font-semibold text-slate-200">${escapeHtml(idx.name)}</span>
-              <span class="text-[11px] text-slate-500">${escapeHtml(idx.code)}</span>
+              <span class="font-semibold text-[#d8e1ea]">${escapeHtml(idx.name)}</span>
+              <span class="text-[11px] text-[#787b86]">${escapeHtml(idx.code)}</span>
             </div>
             <div class="flex items-baseline justify-between mt-1.5 tabular-nums">
-              <span class="text-lg font-bold text-slate-100">${fmtNum(idx.latest_close, 2)}</span>
-              <span class="text-xs font-semibold ${latestCls}">${fmtSigned(idx.latest_pct_chg, 2, "%")} <span class="text-[10px] text-slate-500 font-normal">日</span></span>
+              <span class="text-lg font-bold text-white">${fmtNum(idx.latest_close, 2)}</span>
+              <span class="text-xs font-semibold ${latestCls}">${fmtSigned(idx.latest_pct_chg, 2, "%")} <span class="text-[10px] text-[#787b86] font-normal">日</span></span>
             </div>
-            <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400 tabular-nums">
+            <div class="flex items-center justify-between mt-1 text-[11px] text-[#8b98aa] tabular-nums">
               <span>${d.period.toUpperCase()}涨跌：<strong class="${periodCls}">${fmtSigned(idx.period_pct_chg, 2, "%")}</strong></span>
               <span>${fmtNum(idx.period_low, 0)}~${fmtNum(idx.period_high, 0)}</span>
             </div>
@@ -180,13 +200,13 @@
     styleEl.title = s.style_summary;
   }
 
-  function renderInsights(d) {
-    const grid = document.getElementById("insights-grid");
-    grid.innerHTML = d.insights
+  function renderInsights(d, targetId, titleColorClass = "text-[#5eead4]") {
+    const grid = document.getElementById(targetId);
+    grid.innerHTML = (d.insights || [])
       .map(
         (item) => `
         <div class="zq-insight-card p-3.5">
-          <div class="font-semibold text-[#5eead4] mb-1">${escapeHtml(item.title)}</div>
+          <div class="font-semibold ${titleColorClass} mb-1">${escapeHtml(item.title)}</div>
           <div class="text-[#d1d4dc] leading-relaxed">${renderMarkdownBold(item.body)}</div>
         </div>
       `
@@ -254,31 +274,31 @@
         },
         legend: {
           data: [benchName, "全宽基净流向", "核心护盘/配置"],
-          textStyle: { color: "#94a3b8", fontSize: 11 },
+          textStyle: { color: "#8b98aa", fontSize: 11 },
           top: 0,
         },
         grid: { left: 52, right: 56, top: 34, bottom: 28 },
         xAxis: {
           type: "category",
           data: dates,
-          axisLine: { lineStyle: { color: "#334155" } },
-          axisLabel: { color: "#94a3b8", fontSize: 10 },
+          axisLine: { lineStyle: { color: "#263244" } },
+          axisLabel: { color: "#8b98aa", fontSize: 10 },
         },
         yAxis: [
           {
             type: "value",
             name: d.unit,
-            nameTextStyle: { color: "#64748b", fontSize: 11 },
+            nameTextStyle: { color: "#787b86", fontSize: 11 },
             splitLine: { lineStyle: { color: "rgba(148,163,184,0.1)" } },
-            axisLabel: { color: "#94a3b8", fontSize: 11 },
+            axisLabel: { color: "#8b98aa", fontSize: 11 },
           },
           {
             type: "value",
             name: "点位",
             scale: true,
-            nameTextStyle: { color: "#64748b", fontSize: 11 },
+            nameTextStyle: { color: "#787b86", fontSize: 11 },
             splitLine: { show: false },
-            axisLabel: { color: "#94a3b8", fontSize: 11 },
+            axisLabel: { color: "#8b98aa", fontSize: 11 },
           },
         ],
         series: [
@@ -343,7 +363,7 @@
               <div>占总规模比：<b>${fmtSigned(c.flow_pct_aum, 2, "%")}</b></div>
               <div>加权涨跌：<b>${fmtSigned(c.avg_pct_chg, 2, "%")}</b></div>
               <div>汇总规模：<b>${fmtNum(c.total_aum, 1)} ${d.unit}</b></div>
-              <div style="color:#94a3b8;font-size:11px;margin-top:3px;">包含：${c.members.join(", ")}</div>
+              <div style="color:#8b98aa;font-size:11px;margin-top:3px;">包含：${c.members.join(", ")}</div>
             `;
           },
         },
@@ -351,13 +371,13 @@
         xAxis: {
           type: "value",
           splitLine: { lineStyle: { color: "rgba(148,163,184,0.1)" } },
-          axisLabel: { color: "#94a3b8", fontSize: 11 },
+          axisLabel: { color: "#8b98aa", fontSize: 11 },
         },
         yAxis: {
           type: "category",
           data: names,
-          axisLine: { lineStyle: { color: "#334155" } },
-          axisLabel: { color: "#e2e8f0", fontSize: 12 },
+          axisLine: { lineStyle: { color: "#263244" } },
+          axisLabel: { color: "#d8e1ea", fontSize: 12 },
         },
         series: [
           {
@@ -367,7 +387,7 @@
             label: {
               show: true,
               position: "right",
-              color: "#cbd5e1",
+              color: "#d1d4dc",
               fontSize: 11,
               formatter: (p) => fmtSigned(p.value, 1),
             },
@@ -378,20 +398,20 @@
     );
   }
 
-  function renderSectorsChart(d) {
-    const chart = getOrInitChart("sectors", "chart-sectors");
+  function renderHorizontalFlowChart(chartKey, domId, items, unit, market, labelFormatter) {
+    const chart = getOrInitChart(chartKey, domId);
     if (!chart) return;
 
-    const list = d.sector_rankings || [];
-    const topDown = [...list.slice(0, 8), ...list.slice(-8)].filter(
-      (v, i, arr) => arr.findIndex((x) => x.code === v.code) === i
+    const sorted = [...items].sort((a, b) => b.net_flow - a.net_flow);
+    const topDown = [...sorted.slice(0, 8), ...sorted.slice(-8)].filter(
+      (v, i, arr) => arr.findIndex((x) => x.name === v.name) === i
     );
     topDown.sort((a, b) => a.net_flow - b.net_flow);
 
-    const names = topDown.map((x) => `${x.name}`);
+    const names = topDown.map((x) => x.name);
     const values = topDown.map((x) => ({
       value: x.net_flow,
-      itemStyle: { color: colorForVal(x.net_flow, d.market), borderRadius: x.net_flow >= 0 ? [0, 3, 3, 0] : [3, 0, 0, 3] },
+      itemStyle: { color: colorForVal(x.net_flow, market), borderRadius: x.net_flow >= 0 ? [0, 3, 3, 0] : [3, 0, 0, 3] },
     }));
 
     chart.setOption(
@@ -402,28 +422,19 @@
           backgroundColor: "#111822",
           borderColor: "#263244",
           textStyle: { color: "#d8e1ea", fontSize: 12 },
-          formatter: (params) => {
-            const s = topDown[params[0].dataIndex];
-            return `
-              <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(s.name)} (${s.code})</div>
-              <div>净流向：<b>${fmtSigned(s.net_flow, 2, " " + d.unit)}</b></div>
-              <div>区间涨跌：<b>${fmtSigned(s.period_pct_chg, 2, "%")}</b></div>
-              <div>占规模比：<b>${fmtSigned(s.flow_pct_aum, 2, "%")}</b></div>
-              <div>行为象限：<b>${s.quadrant}</b></div>
-            `;
-          },
+          formatter: (params) => labelFormatter(topDown[params[0].dataIndex], unit),
         },
-        grid: { left: 116, right: 54, top: 12, bottom: 24 },
+        grid: { left: 124, right: 56, top: 12, bottom: 24 },
         xAxis: {
           type: "value",
           splitLine: { lineStyle: { color: "rgba(148,163,184,0.1)" } },
-          axisLabel: { color: "#94a3b8", fontSize: 11 },
+          axisLabel: { color: "#8b98aa", fontSize: 11 },
         },
         yAxis: {
           type: "category",
           data: names,
-          axisLine: { lineStyle: { color: "#334155" } },
-          axisLabel: { color: "#e2e8f0", fontSize: 11 },
+          axisLine: { lineStyle: { color: "#263244" } },
+          axisLabel: { color: "#d8e1ea", fontSize: 11 },
         },
         series: [
           {
@@ -433,7 +444,7 @@
             label: {
               show: true,
               position: "right",
-              color: "#cbd5e1",
+              color: "#d1d4dc",
               fontSize: 10,
               formatter: (p) => fmtSigned(p.value, 1),
             },
@@ -441,6 +452,23 @@
         ],
       },
       true
+    );
+  }
+
+  function renderSectorsChart(d) {
+    renderHorizontalFlowChart(
+      "sectors",
+      "chart-sectors",
+      d.sector_rankings || [],
+      d.unit,
+      d.market,
+      (s, unit) => `
+        <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(s.name)} (${s.code})</div>
+        <div>净流向：<b>${fmtSigned(s.net_flow, 2, " " + unit)}</b></div>
+        <div>区间涨跌：<b>${fmtSigned(s.period_pct_chg, 2, "%")}</b></div>
+        <div>占规模比：<b>${fmtSigned(s.flow_pct_aum, 2, "%")}</b></div>
+        <div>行为象限：<b>${s.quadrant}</b></div>
+      `
     );
   }
 
@@ -487,23 +515,23 @@
           name: "涨跌幅 (%)",
           nameLocation: "middle",
           nameGap: 24,
-          nameTextStyle: { color: "#94a3b8", fontSize: 11 },
+          nameTextStyle: { color: "#8b98aa", fontSize: 11 },
           splitLine: { lineStyle: { color: "rgba(148,163,184,0.08)" } },
-          axisLabel: { color: "#94a3b8", fontSize: 11 },
-          axisLine: { lineStyle: { color: "#475569" } },
+          axisLabel: { color: "#8b98aa", fontSize: 11 },
+          axisLine: { lineStyle: { color: "#334155" } },
         },
         yAxis: {
           name: `净流向 (${d.unit})`,
-          nameTextStyle: { color: "#94a3b8", fontSize: 11 },
+          nameTextStyle: { color: "#8b98aa", fontSize: 11 },
           splitLine: { lineStyle: { color: "rgba(148,163,184,0.08)" } },
-          axisLabel: { color: "#94a3b8", fontSize: 11 },
-          axisLine: { lineStyle: { color: "#475569" } },
+          axisLabel: { color: "#8b98aa", fontSize: 11 },
+          axisLine: { lineStyle: { color: "#334155" } },
         },
         graphic: [
-          { type: "text", right: 32, top: 32, style: { text: "主线共振 (价涨流入)", fill: "rgba(248,250,252,0.28)", font: "bold 11px sans-serif" } },
-          { type: "text", left: 66, top: 32, style: { text: "逆势抄底 (价跌流入)", fill: "rgba(248,250,252,0.28)", font: "bold 11px sans-serif" } },
-          { type: "text", right: 32, bottom: 48, style: { text: "逢高兑现 (价涨流出)", fill: "rgba(248,250,252,0.28)", font: "bold 11px sans-serif" } },
-          { type: "text", left: 66, bottom: 48, style: { text: "资金撤离 (价跌流出)", fill: "rgba(248,250,252,0.28)", font: "bold 11px sans-serif" } },
+          { type: "text", right: 32, top: 32, style: { text: "主线共振 (价涨流入)", fill: "rgba(216,225,234,0.28)", font: "bold 11px sans-serif" } },
+          { type: "text", left: 66, top: 32, style: { text: "逆势抄底 (价跌流入)", fill: "rgba(216,225,234,0.28)", font: "bold 11px sans-serif" } },
+          { type: "text", right: 32, bottom: 48, style: { text: "逢高兑现 (价涨流出)", fill: "rgba(216,225,234,0.28)", font: "bold 11px sans-serif" } },
+          { type: "text", left: 66, bottom: 48, style: { text: "资金撤离 (价跌流出)", fill: "rgba(216,225,234,0.28)", font: "bold 11px sans-serif" } },
         ],
         series: [
           {
@@ -512,7 +540,7 @@
             label: {
               show: true,
               position: "top",
-              color: "#cbd5e1",
+              color: "#d1d4dc",
               fontSize: 10,
               formatter: (p) => p.name.replace(/ETF.*/, ""),
             },
@@ -573,7 +601,7 @@
           <tr data-code="${escapeHtml(r.code)}">
             <td class="font-mono font-semibold text-[#2dd4bf]">${escapeHtml(r.code)}</td>
             <td>
-              <div class="font-medium text-[#ffffff]">${escapeHtml(r.name)}</div>
+              <div class="font-medium text-white">${escapeHtml(r.name)}</div>
               <div class="text-[11px] text-[#787b86]">${escapeHtml(r.cluster_name)}</div>
             </td>
             <td>${catLabelMap[r.category] || r.category}</td>
@@ -592,6 +620,409 @@
       tr.addEventListener("click", () => openDetailModal(tr.dataset.code));
     });
   }
+
+  // ==================== REALTIME INTRADAY DASHBOARD ====================
+
+  async function loadRealtime(force = false) {
+    const icon = document.getElementById("rt-refresh-icon");
+    if (icon) icon.innerHTML = '<span class="spinner"></span>';
+    try {
+      const res = await fetch(`/api/v1/etf-flow/realtime?market=${state.market}&force=${force}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      state.rtData = await res.json();
+      renderRealtimeAll();
+    } finally {
+      if (icon) icon.textContent = "↻";
+    }
+  }
+
+  function renderRealtimeAll() {
+    const d = state.rtData;
+    if (!d) return;
+
+    document.getElementById("lbl-rt-source").textContent = d.source || "--";
+    document.getElementById("lbl-rt-time").textContent = d.quote_time || d.fetched_at || "--";
+    document.getElementById("rt-unit-1").textContent = d.unit;
+    document.getElementById("rt-unit-2").textContent = d.unit;
+    document.getElementById("rt-unit-3").textContent = d.unit;
+
+    // Indices
+    const idxContainer = document.getElementById("rt-indices-strip");
+    idxContainer.innerHTML = (d.indices || [])
+      .map((idx) => {
+        const cls = classForVal(idx.pct_chg, d.market);
+        return `
+          <div class="card-panel px-3.5 py-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-[#d8e1ea]">${escapeHtml(idx.name)}</span>
+              <span class="text-[11px] text-[#787b86]">${escapeHtml(idx.code)}</span>
+            </div>
+            <div class="flex items-baseline justify-between mt-1.5 tabular-nums">
+              <span class="text-lg font-bold text-white">${fmtNum(idx.close, 2)}</span>
+              <span class="text-xs font-semibold ${cls}">${fmtSigned(idx.pct_chg, 2, "%")}</span>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    // KPI Cards
+    const s = d.summary || {};
+    const topInd = s.top_industry;
+    if (topInd) {
+      document.getElementById("rt-kpi-ind-name").textContent = topInd.name;
+      const indFlowEl = document.getElementById("rt-kpi-ind-flow");
+      indFlowEl.textContent = `${fmtSigned(topInd.net_flow, 2, " " + d.unit)} (${fmtSigned(topInd.pct_chg, 2, "%")})`;
+      indFlowEl.className = `text-lg font-bold mt-0.5 tabular-nums ${classForVal(topInd.net_flow, d.market)}`;
+      document.getElementById("rt-kpi-ind-sub").textContent =
+        topInd.lead_stock ? `领涨股：${topInd.lead_stock} (${fmtSigned(topInd.lead_pct, 2, "%")})` : `成交额：${fmtNum(topInd.turnover, 1)} ${d.unit}`;
+    }
+
+    const topCon = s.top_concept;
+    if (topCon) {
+      document.getElementById("rt-kpi-con-name").textContent = topCon.name;
+      const conFlowEl = document.getElementById("rt-kpi-con-flow");
+      conFlowEl.textContent = `${fmtSigned(topCon.net_flow, 2, " " + d.unit)} (${fmtSigned(topCon.pct_chg, 2, "%")})`;
+      conFlowEl.className = `text-lg font-bold mt-0.5 tabular-nums ${classForVal(topCon.net_flow, d.market)}`;
+      document.getElementById("rt-kpi-con-sub").textContent =
+        topCon.lead_stock ? `领涨股：${topCon.lead_stock} (${fmtSigned(topCon.lead_pct, 2, "%")})` : `成交额：${fmtNum(topCon.turnover, 1)} ${d.unit}`;
+    }
+
+    const elRtBroad = document.getElementById("rt-kpi-broad-flow");
+    elRtBroad.textContent = fmtSigned(s.total_broad_active_flow, 2, ` ${d.unit}`);
+    elRtBroad.className = `text-2xl font-bold mt-1.5 tabular-nums ${classForVal(s.total_broad_active_flow, d.market)}`;
+    document.getElementById("rt-kpi-etf-total").textContent =
+      `全监控池 ETF 盘中主动流向合计：${fmtSigned(s.total_etf_active_flow, 2, " " + d.unit)}`;
+
+    document.getElementById("rt-kpi-ind-breadth").textContent = `${s.industry_in_count || 0}/${s.industry_total || 0}`;
+    document.getElementById("rt-kpi-con-breadth").textContent = `${s.concept_in_count || 0}/${s.concept_total || 0}`;
+
+    renderInsights(d, "rt-insights-grid", "text-[#fcd34d]");
+
+    // Realtime Charts
+    renderHorizontalFlowChart(
+      "rtIndustries",
+      "chart-rt-industries",
+      d.industries || [],
+      d.unit,
+      d.market,
+      (x, unit) => `
+        <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(x.name)}</div>
+        <div>涨跌幅：<b>${fmtSigned(x.pct_chg, 2, "%")}</b></div>
+        <div>主力净额：<b>${fmtSigned(x.net_flow, 2, " " + unit)}</b> (净占比 ${fmtSigned(x.net_ratio, 2, "%")})</div>
+        <div>流入 / 流出：${fmtNum(x.inflow, 2)} / ${fmtNum(x.outflow, 2)} ${unit}</div>
+        <div>领涨股：${escapeHtml(x.lead_stock || "--")} (${fmtSigned(x.lead_pct, 2, "%")})</div>
+      `
+    );
+
+    renderHorizontalFlowChart(
+      "rtConcepts",
+      "chart-rt-concepts",
+      d.concepts || [],
+      d.unit,
+      d.market,
+      (x, unit) => `
+        <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(x.name)}</div>
+        <div>涨跌幅：<b>${fmtSigned(x.pct_chg, 2, "%")}</b></div>
+        <div>主力净额：<b>${fmtSigned(x.net_flow, 2, " " + unit)}</b> (净占比 ${fmtSigned(x.net_ratio, 2, "%")})</div>
+        <div>流入 / 流出：${fmtNum(x.inflow, 2)} / ${fmtNum(x.outflow, 2)} ${unit}</div>
+        <div>领涨股：${escapeHtml(x.lead_stock || "--")} (${fmtSigned(x.lead_pct, 2, "%")})</div>
+      `
+    );
+
+    renderRtQuadrantChart(d);
+
+    renderHorizontalFlowChart(
+      "rtEtfs",
+      "chart-rt-etfs",
+      d.etfs || [],
+      d.unit,
+      d.market,
+      (x, unit) => `
+        <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(x.name)} (${x.code})</div>
+        <div>最新价：<b>${fmtNum(x.price, 3)}</b> (${fmtSigned(x.pct_chg, 2, "%")})</div>
+        <div>盘中主动净买：<b>${fmtSigned(x.net_flow, 2, " " + unit)}</b> (净占比 ${fmtSigned(x.net_ratio, 2, "%")})</div>
+        <div>实时成交额：${fmtNum(x.turnover, 2)} ${unit} · 量比：${fmtNum(x.vol_ratio, 2)}</div>
+        <div>IOPV 折溢价：${fmtSigned(x.discount_pct, 2, "%")}</div>
+      `
+    );
+
+    renderRealtimeTable();
+  }
+
+  function renderRtQuadrantChart(d) {
+    const chart = getOrInitChart("rtQuadrant", "chart-rt-quadrant");
+    if (!chart) return;
+
+    const pts = d.quadrant_points || [];
+    const maxTurn = Math.max(...pts.map((x) => x.turnover || 1), 1);
+
+    const scatterData = pts.map((x) => ({
+      name: x.name,
+      value: [x.pct_chg, x.net_flow, x.turnover, x.kind, x.quadrant, x.net_ratio],
+      symbol: x.kind === "题材" ? "diamond" : "circle",
+      symbolSize: Math.max(10, Math.min(30, 10 + Math.sqrt((x.turnover || 1) / maxTurn) * 20)),
+      itemStyle: {
+        color: colorForVal(x.net_flow, d.market),
+        opacity: 0.82,
+        borderColor: x.kind === "题材" ? "#fbbf24" : "#f8fafc",
+        borderWidth: 1,
+      },
+    }));
+
+    chart.setOption(
+      {
+        tooltip: {
+          trigger: "item",
+          backgroundColor: "#111822",
+          borderColor: "#263244",
+          textStyle: { color: "#d8e1ea", fontSize: 12 },
+          formatter: (p) => {
+            const v = p.value;
+            return `
+              <div style="font-weight:600;margin-bottom:4px;">[${v[3]}] ${escapeHtml(p.name)}</div>
+              <div>象限：<b>${v[4]}</b></div>
+              <div>涨跌幅：<b>${fmtSigned(v[0], 2, "%")}</b></div>
+              <div>实时净额：<b>${fmtSigned(v[1], 2, " " + d.unit)}</b> (净占比 ${fmtSigned(v[5], 2, "%")})</div>
+              <div>总成交/资金：<b>${fmtNum(v[2], 1)} ${d.unit}</b></div>
+            `;
+          },
+        },
+        grid: { left: 56, right: 26, top: 28, bottom: 38 },
+        xAxis: {
+          name: "实时涨跌幅 (%)",
+          nameLocation: "middle",
+          nameGap: 24,
+          nameTextStyle: { color: "#8b98aa", fontSize: 11 },
+          splitLine: { lineStyle: { color: "rgba(148,163,184,0.08)" } },
+          axisLabel: { color: "#8b98aa", fontSize: 11 },
+          axisLine: { lineStyle: { color: "#334155" } },
+        },
+        yAxis: {
+          name: `净流向 (${d.unit})`,
+          nameTextStyle: { color: "#8b98aa", fontSize: 11 },
+          splitLine: { lineStyle: { color: "rgba(148,163,184,0.08)" } },
+          axisLabel: { color: "#8b98aa", fontSize: 11 },
+          axisLine: { lineStyle: { color: "#334155" } },
+        },
+        graphic: [
+          { type: "text", right: 32, top: 32, style: { text: "主线共振 (价涨流入)", fill: "rgba(216,225,234,0.28)", font: "bold 11px sans-serif" } },
+          { type: "text", left: 66, top: 32, style: { text: "逆势抄底 (价跌流入)", fill: "rgba(216,225,234,0.28)", font: "bold 11px sans-serif" } },
+          { type: "text", right: 32, bottom: 48, style: { text: "逢高兑现 (价涨流出)", fill: "rgba(216,225,234,0.28)", font: "bold 11px sans-serif" } },
+          { type: "text", left: 66, bottom: 48, style: { text: "资金撤离 (价跌流出)", fill: "rgba(216,225,234,0.28)", font: "bold 11px sans-serif" } },
+        ],
+        series: [
+          {
+            type: "scatter",
+            data: scatterData,
+            label: {
+              show: true,
+              position: "top",
+              color: "#d1d4dc",
+              fontSize: 10,
+              formatter: (p) => p.name.replace(/\s*\([A-Z]+\)$/, ""),
+            },
+            markLine: {
+              silent: true,
+              symbol: "none",
+              lineStyle: { color: "rgba(148,163,184,0.35)", type: "dashed" },
+              data: [{ xAxis: 0 }, { yAxis: 0 }],
+            },
+          },
+        ],
+      },
+      true
+    );
+  }
+
+  function renderRealtimeTable() {
+    const d = state.rtData;
+    if (!d) return;
+
+    const thead = document.getElementById("rt-table-head");
+    const tbody = document.getElementById("rt-table-body");
+    const kw = state.rtSearch.trim().toLowerCase();
+
+    if (state.rtTab === "etfs") {
+      thead.innerHTML = `
+        <tr>
+          <th data-rtsort="code">代码</th>
+          <th data-rtsort="name">ETF名称 / 所属簇</th>
+          <th data-rtsort="category">分类</th>
+          <th data-rtsort="price">最新价</th>
+          <th data-rtsort="pct_chg">涨跌幅</th>
+          <th data-rtsort="net_flow">盘中主动净买</th>
+          <th data-rtsort="net_ratio">主动净占比</th>
+          <th data-rtsort="turnover">实时成交额</th>
+          <th data-rtsort="vol_ratio">量比</th>
+          <th data-rtsort="discount_pct">IOPV折溢价</th>
+          <th data-rtsort="quadrant">象限</th>
+        </tr>
+      `;
+    } else {
+      thead.innerHTML = `
+        <tr>
+          <th data-rtsort="code">代码/标识</th>
+          <th data-rtsort="name">${state.rtTab === "industries" ? "行业板块" : "概念题材"}</th>
+          <th data-rtsort="company_count">成分/龙头数</th>
+          <th data-rtsort="pct_chg">实时涨跌</th>
+          <th data-rtsort="net_flow">实时净流入</th>
+          <th data-rtsort="net_ratio">净占比</th>
+          <th data-rtsort="inflow">流入资金</th>
+          <th data-rtsort="outflow">流出资金</th>
+          <th data-rtsort="lead_stock">领涨股</th>
+          <th data-rtsort="quadrant">行为象限</th>
+        </tr>
+      `;
+    }
+
+    let sourceRows =
+      state.rtTab === "industries"
+        ? d.industries || []
+        : state.rtTab === "concepts"
+          ? d.concepts || []
+          : d.etfs || [];
+
+    let rows = sourceRows.filter((item) => {
+      if (!kw) return true;
+      return (
+        String(item.code || "").toLowerCase().includes(kw) ||
+        String(item.name || "").toLowerCase().includes(kw) ||
+        String(item.lead_stock || "").toLowerCase().includes(kw) ||
+        String(item.cluster_name || "").toLowerCase().includes(kw)
+      );
+    });
+
+    rows.sort((a, b) => {
+      const va = a[state.rtSortKey];
+      const vb = b[state.rtSortKey];
+      if (typeof va === "string") {
+        return state.rtSortDesc ? vb.localeCompare(va) : va.localeCompare(vb);
+      }
+      return state.rtSortDesc ? (vb || 0) - (va || 0) : (va || 0) - (vb || 0);
+    });
+
+    const catLabelMap = {
+      broad: '<span class="badge-tag bg-[#2dd4bf]/15 text-[#5eead4] border border-[#2dd4bf]/35">宽基</span>',
+      sector: '<span class="badge-tag bg-violet-500/15 text-[#c4b5fd] border border-violet-400/35">行业</span>',
+      theme: '<span class="badge-tag bg-[#fbbf24]/15 text-[#fcd34d] border border-[#fbbf24]/35">题材</span>',
+      macro: '<span class="badge-tag bg-[#2a2e39] text-[#a8b5c7] border border-[#363c4e]">宏观</span>',
+    };
+
+    if (state.rtTab === "etfs") {
+      tbody.innerHTML = rows
+        .map((r) => {
+          const flowCls = classForVal(r.net_flow, d.market);
+          const pctCls = classForVal(r.pct_chg, d.market);
+          return `
+            <tr data-code="${escapeHtml(r.code)}">
+              <td class="font-mono font-semibold text-[#2dd4bf]">${escapeHtml(r.code)}</td>
+              <td>
+                <div class="font-medium text-white">${escapeHtml(r.name)}</div>
+                <div class="text-[11px] text-[#787b86]">${escapeHtml(r.cluster_name)}</div>
+              </td>
+              <td>${catLabelMap[r.category] || r.category}</td>
+              <td class="text-[#d8e1ea]">${fmtNum(r.price, 3)}</td>
+              <td class="font-semibold ${pctCls}">${fmtSigned(r.pct_chg, 2, "%")}</td>
+              <td class="font-bold ${flowCls}">${fmtSigned(r.net_flow, 2, " " + d.unit)}</td>
+              <td class="${flowCls}">${fmtSigned(r.net_ratio, 2, "%")}</td>
+              <td class="text-[#a8b5c7]">${fmtNum(r.turnover, 2)} ${d.unit}</td>
+              <td class="text-[#d8e1ea]">${fmtNum(r.vol_ratio, 2)}</td>
+              <td class="text-[#a8b5c7]">${fmtSigned(r.discount_pct, 2, "%")}</td>
+              <td><span class="badge-tag bg-[#1c2030] text-[#d1d4dc] border border-[#2a2e39]">${escapeHtml(r.quadrant)}</span></td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      tbody.querySelectorAll("tr").forEach((tr) => {
+        tr.addEventListener("click", () => openDetailModal(tr.dataset.code));
+      });
+    } else {
+      tbody.innerHTML = rows
+        .map((r) => {
+          const flowCls = classForVal(r.net_flow, d.market);
+          const pctCls = classForVal(r.pct_chg, d.market);
+          const leadCls = classForVal(r.lead_pct, d.market);
+          return `
+            <tr>
+              <td class="font-mono text-[#8b98aa] text-xs">${escapeHtml(r.code)}</td>
+              <td class="font-semibold text-white">${escapeHtml(r.name)}</td>
+              <td class="text-[#a8b5c7]">${r.company_count || "--"}</td>
+              <td class="font-semibold ${pctCls}">${fmtSigned(r.pct_chg, 2, "%")}</td>
+              <td class="font-bold ${flowCls}">${fmtSigned(r.net_flow, 2, " " + d.unit)}</td>
+              <td class="${flowCls}">${fmtSigned(r.net_ratio, 2, "%")}</td>
+              <td class="text-[#d8e1ea]">${fmtNum(r.inflow, 2)} ${d.unit}</td>
+              <td class="text-[#a8b5c7]">${fmtNum(r.outflow, 2)} ${d.unit}</td>
+              <td>
+                <span class="text-white">${escapeHtml(r.lead_stock || "--")}</span>
+                <span class="text-xs font-semibold ml-1 ${leadCls}">${fmtSigned(r.lead_pct, 2, "%")}</span>
+              </td>
+              <td><span class="badge-tag bg-[#1c2030] text-[#d1d4dc] border border-[#2a2e39]">${escapeHtml(r.quadrant)}</span></td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+
+    thead.querySelectorAll("th[data-rtsort]").forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.rtsort;
+        if (state.rtSortKey === key) {
+          state.rtSortDesc = !state.rtSortDesc;
+        } else {
+          state.rtSortKey = key;
+          state.rtSortDesc = true;
+        }
+        renderRealtimeTable();
+      });
+    });
+  }
+
+  function switchViewMode(view) {
+    state.viewMode = view;
+    document.querySelectorAll("#view-mode-switch .seg-btn").forEach((b) => {
+      b.classList.remove("active", "active-gold");
+      if (b.dataset.view === view) {
+        b.classList.add(view === "realtime" ? "active-gold" : "active");
+      }
+    });
+
+    const postEl = document.getElementById("view-postmarket");
+    const rtEl = document.getElementById("view-realtime");
+
+    if (view === "realtime") {
+      postEl.classList.add("hidden");
+      rtEl.classList.remove("hidden");
+      if (!state.rtData || state.rtData.market !== state.market) {
+        loadRealtime(false).then(() => resizeAllCharts());
+      } else {
+        resizeAllCharts();
+      }
+    } else {
+      rtEl.classList.add("hidden");
+      postEl.classList.remove("hidden");
+      if (!state.data || state.data.market !== state.market) {
+        loadDashboard().then(() => resizeAllCharts());
+      } else {
+        resizeAllCharts();
+      }
+    }
+  }
+
+  function setGlobalMarket(market) {
+    state.market = market;
+    document.querySelectorAll(".market-switch-group .seg-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.market === market);
+    });
+    if (state.viewMode === "realtime") {
+      loadRealtime(false);
+    } else {
+      loadDashboard();
+    }
+  }
+
+  // ==================== DETAIL MODAL & CONTROLS ====================
 
   async function openDetailModal(code) {
     const modal = document.getElementById("modal-detail");
@@ -628,27 +1059,27 @@
         },
         legend: {
           data: ["每日净流入", "收盘价"],
-          textStyle: { color: "#94a3b8", fontSize: 11 },
+          textStyle: { color: "#8b98aa", fontSize: 11 },
         },
         grid: { left: 54, right: 54, top: 34, bottom: 28 },
         xAxis: {
           type: "category",
           data: dates,
-          axisLabel: { color: "#94a3b8", fontSize: 10 },
+          axisLabel: { color: "#8b98aa", fontSize: 10 },
         },
         yAxis: [
           {
             type: "value",
             name: unit,
             splitLine: { lineStyle: { color: "rgba(148,163,184,0.1)" } },
-            axisLabel: { color: "#94a3b8", fontSize: 11 },
+            axisLabel: { color: "#8b98aa", fontSize: 11 },
           },
           {
             type: "value",
             name: "价格",
             scale: true,
             splitLine: { show: false },
-            axisLabel: { color: "#94a3b8", fontSize: 11 },
+            axisLabel: { color: "#8b98aa", fontSize: 11 },
           },
         ],
         series: [
@@ -673,13 +1104,12 @@
   }
 
   function wireEvents() {
-    document.querySelectorAll("#market-switch .seg-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll("#market-switch .seg-btn").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        state.market = btn.dataset.market;
-        loadDashboard();
-      });
+    document.querySelectorAll("#view-mode-switch .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => switchViewMode(btn.dataset.view));
+    });
+
+    document.querySelectorAll(".market-switch-group .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => setGlobalMarket(btn.dataset.market));
     });
 
     document.querySelectorAll("#period-switch .seg-btn").forEach((btn) => {
@@ -716,6 +1146,50 @@
         }
         renderTable();
       });
+    });
+
+    // Realtime controls
+    document.getElementById("btn-rt-refresh").addEventListener("click", () => loadRealtime(true));
+
+    document.getElementById("btn-rt-auto").addEventListener("click", () => {
+      state.rtAutoRefresh = !state.rtAutoRefresh;
+      const dot = document.getElementById("rt-auto-dot");
+      const label = document.getElementById("rt-auto-label");
+      const btn = document.getElementById("btn-rt-auto");
+      if (state.rtAutoRefresh) {
+        dot.className = "w-2 h-2 rounded-full bg-[#2dd4bf] animate-pulse";
+        label.textContent = "自动刷新: 30s";
+        btn.classList.add("border-[#2dd4bf]");
+        state.rtTimer = setInterval(() => {
+          if (state.viewMode === "realtime") {
+            loadRealtime(true);
+          }
+        }, 30000);
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-[#787b86]";
+        label.textContent = "自动刷新: 关";
+        btn.classList.remove("border-[#2dd4bf]");
+        if (state.rtTimer) {
+          clearInterval(state.rtTimer);
+          state.rtTimer = null;
+        }
+      }
+    });
+
+    document.querySelectorAll("#rt-tab-switch .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#rt-tab-switch .seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.rtTab = btn.dataset.rttab;
+        state.rtSortKey = "net_flow";
+        state.rtSortDesc = true;
+        renderRealtimeTable();
+      });
+    });
+
+    document.getElementById("rt-search-input").addEventListener("input", (e) => {
+      state.rtSearch = e.target.value;
+      renderRealtimeTable();
     });
 
     // Modals close
@@ -769,11 +1243,7 @@
         } else {
           document.getElementById("modal-add").classList.remove("open");
           form.reset();
-          state.market = payload.market;
-          document.querySelectorAll("#market-switch .seg-btn").forEach((b) => {
-            b.classList.toggle("active", b.dataset.market === state.market);
-          });
-          await loadDashboard();
+          setGlobalMarket(payload.market);
         }
       } catch (err) {
         msgEl.textContent = "请求异常: " + err.message;
@@ -793,7 +1263,7 @@
       document.getElementById("report-content").textContent = data.content || "";
     });
 
-    // Sync button
+    // Sync post-market button
     document.getElementById("btn-sync").addEventListener("click", async () => {
       const btn = document.getElementById("btn-sync");
       const icon = document.getElementById("sync-icon");
@@ -815,11 +1285,7 @@
       }
     });
 
-    window.addEventListener("resize", () => {
-      Object.values(charts).forEach((c) => {
-        if (c) c.resize();
-      });
-    });
+    window.addEventListener("resize", resizeAllCharts);
   }
 
   wireEvents();

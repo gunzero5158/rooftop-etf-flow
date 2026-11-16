@@ -119,6 +119,12 @@ body {
   color: var(--primary-teal-bright);
 }
 
+.seg-btn.active-gold {
+  background-color: rgba(251, 191, 36, 0.14);
+  border-color: rgba(251, 191, 36, 0.58);
+  color: var(--primary-gold-bright);
+}
+
 /* Action Buttons matching zenith-quant header controls */
 .zq-btn-secondary {
   background-color: var(--bg-control);
