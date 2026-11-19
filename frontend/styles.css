@@ -395,9 +395,37 @@ table.etf-table tbody td:nth-child(3) {
   gap: 10px;
 }
 
+#pm-quadrant-matrix {
+  height: 460px;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+#pm-quadrant-matrix .quadrant-cell {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#pm-quadrant-matrix .quadrant-cell-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
 @media (max-width: 640px) {
   .quadrant-matrix-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+  #pm-quadrant-matrix {
+    height: auto;
+    grid-template-rows: none;
+  }
+  #pm-quadrant-matrix .quadrant-cell {
+    height: auto;
+    min-height: 200px;
+  }
+  #pm-quadrant-matrix .quadrant-cell-list {
+    max-height: 220px;
   }
 }
 
