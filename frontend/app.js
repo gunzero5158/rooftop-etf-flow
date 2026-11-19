@@ -1579,7 +1579,7 @@
       document.getElementById("report-content").textContent = data.content || "";
     });
 
-    // Sync post-market button
+    // Sync post-market button (syncs both CN and US)
     document.getElementById("btn-sync").addEventListener("click", async () => {
       const btn = document.getElementById("btn-sync");
       const icon = document.getElementById("sync-icon");
@@ -1588,12 +1588,18 @@
       icon.innerHTML = '<span class="spinner"></span>';
       label.textContent = "同步中...";
       try {
-        await fetch("/api/v1/etf-flow/sync", {
+        const res = await fetch("/api/v1/etf-flow/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ market: state.market, days: 30 }),
+          body: JSON.stringify({ market: "ALL", days: 25 }),
         });
+        const data = await res.json();
         await loadDashboard();
+        const cnDate = data?.results?.CN?.latest_flow_date || "--";
+        const usDate = data?.results?.US?.latest_flow_date || "--";
+        showToast(`数据同步完成！A股份额结算至 ${cnDate}，美股资金流结算至 ${usDate}`);
+      } catch (err) {
+        showToast(`同步失败：${err.message}`, true);
       } finally {
         btn.disabled = false;
         icon.textContent = "↻";
@@ -1604,7 +1610,51 @@
     window.addEventListener("resize", resizeAllCharts);
   }
 
+  let toastTimer = null;
+  function showToast(msg, isError = false) {
+    const el = document.getElementById("toast-banner");
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `fixed bottom-5 right-5 z-50 max-w-md px-4 py-3 rounded-lg bg-[#111822] text-xs shadow-2xl border ${
+      isError ? "border-[#f23645]/60 text-[#fca5a5]" : "border-[#2dd4bf]/60 text-[#5eead4]"
+    }`;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      el.classList.add("hidden");
+    }, 5500);
+  }
+
+  async function checkSyncStatusAndRefresh() {
+    try {
+      const res = await fetch("/api/v1/etf-flow/sync/status");
+      if (!res.ok) return;
+      const st = await res.json();
+      const badge = document.getElementById("lbl-sync-status");
+      if (st.running) {
+        if (badge) badge.classList.remove("hidden");
+        setTimeout(async () => {
+          const r2 = await fetch("/api/v1/etf-flow/sync/status");
+          const st2 = await r2.json();
+          if (!st2.running) {
+            if (badge) badge.classList.add("hidden");
+            await loadDashboard();
+            const cnDate = st2?.CN?.latest_flow_date || "--";
+            const usDate = st2?.US?.latest_flow_date || "--";
+            showToast(`后台已自动完成盘后更新：A股份额至 ${cnDate}，美股资金流至 ${usDate}`);
+          } else {
+            checkSyncStatusAndRefresh();
+          }
+        }, 3000);
+      } else if (badge) {
+        badge.classList.add("hidden");
+      }
+    } catch {
+      // Ignore polling error
+    }
+  }
+
   wireEvents();
   loadDashboard();
   preloadRealtimeBadge();
+  checkSyncStatusAndRefresh();
 })();

@@ -107,6 +107,9 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5 text-xs">
+          <span id="lbl-sync-status" class="zq-status-pill px-3 py-1.5 hidden text-[#5eead4]">
+            ● 后台自动同步中...
+          </span>
           <span class="zq-status-pill px-3 py-1.5">
             资金流统计窗口：<strong id="lbl-flow-window" class="text-[#d8e1ea] tabular-nums">--</strong>
           </span>
@@ -475,8 +478,11 @@
   </main>
 
   <footer class="zq-footer py-3.5 text-center text-xs">
-    Rooftop ETF Flow（天台ETF资金流）v0.2.3 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 仅供研究复盘，不构成投资建议
+    Rooftop ETF Flow（天台ETF资金流）v0.3.0 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 每日 08:40/17:30/21:00 自动增量更新
   </footer>
+
+  <!-- Toast Notification -->
+  <div id="toast-banner" class="fixed bottom-5 right-5 z-50 hidden max-w-md px-4 py-3 rounded-lg bg-[#111822] border border-[#2dd4bf]/60 text-xs text-[#d8e1ea] shadow-2xl"></div>
 
   <!-- Modal 1: Single ETF Historical Trend -->
   <div id="modal-detail" class="modal-backdrop">

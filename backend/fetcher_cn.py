@@ -385,9 +385,9 @@ def sync_cn_data(lookback_days: int = 85, target_codes: list[str] | None = None)
 
     upsert_etf_daily(etf_daily_rows)
 
-    # 3. Fetch SSE shares by date (skip dates already complete for all target SSE codes, always recheck last 3 days)
+    # 3. Fetch SSE shares by date (skip dates already complete for all target SSE codes, always recheck last 5 days)
     if sse_codes:
-        recent_recheck = set(trade_dates[-3:])
+        recent_recheck = set(trade_dates[-5:])
         with get_conn() as conn:
             complete_dates_rows = conn.execute(
                 f"""

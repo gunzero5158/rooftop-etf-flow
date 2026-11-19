@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Literal
+import datetime as dt
+import threading
+import time
+from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,13 +20,33 @@ from backend.analyzer import (
     get_dashboard_data,
     get_etf_detail_history,
 )
-from backend.db import BASE_DIR, init_db, load_universe, save_universe, sync_meta_from_universe
+from backend.db import (
+    BASE_DIR,
+    get_latest_sync,
+    init_db,
+    load_universe,
+    save_universe,
+    sync_meta_from_universe,
+)
 from backend.fetcher_cn import sync_cn_data
 from backend.fetcher_us import sync_us_data
 from backend.realtime import get_realtime_flow_data
 
 FRONTEND_DIR = BASE_DIR / "frontend"
 REPORT_PATH = BASE_DIR / "docs" / "reports" / "latest_analysis_report.md"
+TZ_CN = ZoneInfo("Asia/Shanghai")
+AUTO_SYNC_SLOTS = ((8, 40), (17, 30), (21, 0))
+
+_SYNC_LOCK = threading.Lock()
+_SYNC_STATE: dict[str, Any] = {
+    "running": False,
+    "last_trigger": "",
+    "last_started_at": "",
+    "last_finished_at": "",
+    "last_error": "",
+    "results": {},
+}
+_SCHEDULER_STARTED = False
 
 app = FastAPI(
     title="Rooftop ETF Flow API",
@@ -39,10 +62,99 @@ app.add_middleware(
 )
 
 
+def _run_sync_locked(
+    market: Literal["CN", "US", "ALL"] = "ALL",
+    days: int = 30,
+    trigger: str = "manual",
+) -> dict[str, Any]:
+    """Execute market sync under a mutex lock and track execution status."""
+    with _SYNC_LOCK:
+        _SYNC_STATE["running"] = True
+        _SYNC_STATE["last_trigger"] = trigger
+        _SYNC_STATE["last_started_at"] = dt.datetime.now(TZ_CN).strftime("%Y-%m-%d %H:%M:%S")
+        _SYNC_STATE["last_error"] = ""
+        results: dict[str, Any] = {}
+        try:
+            if market in ("CN", "ALL"):
+                results["CN"] = sync_cn_data(lookback_days=days)
+            if market in ("US", "ALL"):
+                results["US"] = sync_us_data(lookback_days=days)
+            report_path = generate_markdown_report(REPORT_PATH)
+            _SYNC_STATE["results"] = results
+            _SYNC_STATE["last_finished_at"] = dt.datetime.now(TZ_CN).strftime("%Y-%m-%d %H:%M:%S")
+            return {
+                "status": "ok",
+                "results": results,
+                "report_path": str(report_path),
+            }
+        except Exception as exc:
+            _SYNC_STATE["last_error"] = str(exc)
+            raise
+        finally:
+            _SYNC_STATE["running"] = False
+
+
+def _has_missed_weekday_since(last_date_str: str, today_cn: dt.date) -> bool:
+    """Return True if at least one full weekday passed after last_date_str before today_cn."""
+    if not last_date_str:
+        return True
+    try:
+        last_d = dt.date.fromisoformat(last_date_str[:10])
+    except ValueError:
+        return True
+    cur = last_d + dt.timedelta(days=1)
+    while cur < today_cn:
+        if cur.weekday() < 5:
+            return True
+        cur += dt.timedelta(days=1)
+    return False
+
+
+def _auto_sync_scheduler() -> None:
+    """Background daemon that catches up stale data on boot and runs scheduled daily syncs."""
+    try:
+        today_cn = dt.datetime.now(TZ_CN).date()
+        cn_sync = get_latest_sync("CN")
+        us_sync = get_latest_sync("US")
+        cn_stale = not cn_sync or _has_missed_weekday_since(cn_sync.get("latest_flow_date", ""), today_cn)
+        us_stale = not us_sync or _has_missed_weekday_since(us_sync.get("latest_flow_date", ""), today_cn)
+        if cn_stale or us_stale:
+            _run_sync_locked(market="ALL", days=20, trigger="startup_catchup")
+    except Exception:
+        pass
+
+    executed_slots: set[str] = set()
+    while True:
+        time.sleep(30)
+        try:
+            now_cn = dt.datetime.now(TZ_CN)
+            # Run scheduled slots Mon-Fri, plus Sat 08:40 for US Friday night settlement
+            if now_cn.weekday() == 6:
+                continue
+            for slot_h, slot_m in AUTO_SYNC_SLOTS:
+                if now_cn.weekday() == 5 and (slot_h, slot_m) != (8, 40):
+                    continue
+                slot_key = f"{now_cn.strftime('%Y-%m-%d')}_{slot_h:02d}:{slot_m:02d}"
+                if slot_key in executed_slots:
+                    continue
+                slot_dt = now_cn.replace(hour=slot_h, minute=slot_m, second=0, microsecond=0)
+                diff_sec = (now_cn - slot_dt).total_seconds()
+                if 0 <= diff_sec <= 180:
+                    executed_slots.add(slot_key)
+                    _run_sync_locked(market="ALL", days=20, trigger=f"cron_{slot_h:02d}{slot_m:02d}")
+        except Exception:
+            continue
+
+
 @app.on_event("startup")
 def _on_startup() -> None:
-    """Ensure SQLite schema and ETF metadata are initialized on boot."""
+    """Ensure SQLite schema, ETF metadata, and background sync scheduler are started."""
+    global _SCHEDULER_STARTED
     init_db()
+    if not _SCHEDULER_STARTED:
+        _SCHEDULER_STARTED = True
+        t = threading.Thread(target=_auto_sync_scheduler, name="rooftop-auto-sync", daemon=True)
+        t.start()
 
 
 class SyncRequest(BaseModel):
@@ -105,20 +217,20 @@ def api_universe() -> dict:
     return load_universe()
 
 
+@app.get("/api/v1/etf-flow/sync/status")
+def api_sync_status() -> dict[str, Any]:
+    """Return current background/manual sync state and latest sync records for CN and US."""
+    return {
+        **_SYNC_STATE,
+        "CN": get_latest_sync("CN"),
+        "US": get_latest_sync("US"),
+    }
+
+
 @app.post("/api/v1/etf-flow/sync")
 def api_sync(req: SyncRequest) -> dict:
     """Trigger incremental or lookback data synchronization and regenerate report."""
-    results = {}
-    if req.market in ("CN", "ALL"):
-        results["CN"] = sync_cn_data(lookback_days=req.days)
-    if req.market in ("US", "ALL"):
-        results["US"] = sync_us_data(lookback_days=req.days)
-    report_path = generate_markdown_report(REPORT_PATH)
-    return {
-        "status": "ok",
-        "results": results,
-        "report_path": str(report_path),
-    }
+    return _run_sync_locked(market=req.market, days=req.days, trigger="manual")
 
 
 @app.post("/api/v1/etf-flow/universe/add")

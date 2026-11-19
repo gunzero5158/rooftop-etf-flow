@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 import threading
 import time
 from io import StringIO
@@ -15,10 +16,23 @@ from akshare.stock_feature.stock_fund_flow import _get_file_content_ths, py_mini
 
 from backend.db import load_universe
 
-CACHE_TTL_SECONDS = 15.0
+CACHE_TTL_SECONDS = 30.0
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_LAST_GOOD_CN_BOARDS: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 _CACHE_LOCK = threading.Lock()
 _THS_LOCK = threading.Lock()
+_THS_JS_CTX: Any = None
+
+
+def _get_ths_v_code() -> str:
+    """Generate a Tonghuashun hexin-v token using a singleton MiniRacer V8 context."""
+    global _THS_JS_CTX
+    with _THS_LOCK:
+        if _THS_JS_CTX is None:
+            ctx = py_mini_racer.MiniRacer()
+            ctx.eval(_get_file_content_ths("ths.js"))
+            _THS_JS_CTX = ctx
+        return str(_THS_JS_CTX.call("v"))
 
 HEADERS_BROWSER = {
     "User-Agent": (
@@ -39,17 +53,12 @@ CONCEPT_NOISE_KEYWORDS = (
     "昨日",
     "预增",
     "预亏",
-    "央企",
-    "国企改革",
-    "证金持股",
     "基金重仓",
     "保险重仓",
     "社保重仓",
     "QFII",
     "百元股",
     "低价股",
-    "微盘股",
-    "破净",
     "ST板块",
     "含H股",
     "AH股",
@@ -162,63 +171,84 @@ def _fetch_tencent_quotes(symbols: list[str]) -> dict[str, list[str]]:
     return parsed
 
 
-def _fetch_ths_board_page(
+def _fetch_ths_board_page_with_retry(
     sess: requests.Session,
     board: str,
     order: str,
     page: int,
-) -> list[dict[str, Any]]:
+    field: str = "je",
+    retries: int = 3,
+) -> tuple[list[dict[str, Any]], int]:
     """Fetch one page of Tonghuashun realtime industry (hyzjl) or concept (gnzjl) fund flow."""
-    with _THS_LOCK:
-        js_code = py_mini_racer.MiniRacer()
-        js_code.eval(_get_file_content_ths("ths.js"))
-        v_code = js_code.call("v")
+    for attempt in range(retries):
+        try:
+            v_code = _get_ths_v_code()
 
-    headers = {
-        "Accept": "text/html, */*; q=0.01",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        "hexin-v": v_code,
-        "Host": "data.10jqka.com.cn",
-        "Referer": f"http://data.10jqka.com.cn/funds/{board}/",
-        "User-Agent": HEADERS_BROWSER["User-Agent"],
-        "X-Requested-With": "XMLHttpRequest",
-    }
-    url = f"http://data.10jqka.com.cn/funds/{board}/field/je/order/{order}/page/{page}/ajax/1/free/1/"
-    resp = sess.get(url, headers=headers, timeout=12)
-    resp.raise_for_status()
-    dfs = pd.read_html(StringIO(resp.text))
-    if not dfs:
-        return []
-    df = dfs[0]
-    items: list[dict[str, Any]] = []
-    for _, row in df.iterrows():
-        name = str(row.iloc[1]).strip()
-        pct_chg = _safe_float(row.iloc[3])
-        inflow = round(_safe_float(row.iloc[4]), 2)
-        outflow = round(_safe_float(row.iloc[5]), 2)
-        net_flow = round(_safe_float(row.iloc[6]), 2)
-        company_cnt = int(_safe_float(row.iloc[7], 0))
-        lead_stock = str(row.iloc[8]).strip() if len(row) > 8 else ""
-        lead_pct = round(_safe_float(row.iloc[9]), 2) if len(row) > 9 else 0.0
-        total_turnover = inflow + outflow
-        net_ratio = round(net_flow / total_turnover * 100.0, 2) if total_turnover > 0 else 0.0
-        items.append(
-            {
-                "code": name,
-                "name": name,
-                "pct_chg": round(pct_chg, 2),
-                "inflow": inflow,
-                "outflow": outflow,
-                "net_flow": net_flow,
-                "net_ratio": net_ratio,
-                "turnover": round(total_turnover, 2),
-                "company_count": company_cnt,
-                "lead_stock": lead_stock,
-                "lead_pct": lead_pct,
-                "quadrant": _classify_quadrant(pct_chg, net_flow),
+            headers = {
+                "Accept": "text/html, */*; q=0.01",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "hexin-v": v_code,
+                "Host": "data.10jqka.com.cn",
+                "Referer": f"http://data.10jqka.com.cn/funds/{board}/",
+                "User-Agent": HEADERS_BROWSER["User-Agent"],
+                "X-Requested-With": "XMLHttpRequest",
             }
-        )
-    return items
+            url = f"http://data.10jqka.com.cn/funds/{board}/field/{field}/order/{order}/page/{page}/ajax/1/free/1/"
+            resp = sess.get(url, headers=headers, timeout=12)
+            resp.raise_for_status()
+
+            m_page = re.search(r'class="page_info"[^>]*>\s*\d+\s*/\s*(\d+)\s*<', resp.text)
+            total_pages = int(m_page.group(1)) if m_page else 1
+
+            dfs = pd.read_html(StringIO(resp.text))
+            if not dfs:
+                raise ValueError(f"No table on {board} page {page}")
+
+            df = dfs[0]
+            if df.empty:
+                # Server intermittently returns an empty table on middle pages; refresh session once before giving up
+                if attempt == 0:
+                    sess = _direct_session()
+                    time.sleep(0.3)
+                    continue
+                return [], total_pages
+
+            items: list[dict[str, Any]] = []
+            for _, row in df.iterrows():
+                name = str(row.iloc[1]).strip()
+                if not name or name == "nan":
+                    continue
+                pct_chg = _safe_float(row.iloc[3])
+                inflow = round(_safe_float(row.iloc[4]), 2)
+                outflow = round(_safe_float(row.iloc[5]), 2)
+                net_flow = round(_safe_float(row.iloc[6]), 2)
+                company_cnt = int(_safe_float(row.iloc[7], 0))
+                lead_stock = str(row.iloc[8]).strip() if len(row) > 8 else ""
+                lead_pct = round(_safe_float(row.iloc[9]), 2) if len(row) > 9 else 0.0
+                total_turnover = inflow + outflow
+                net_ratio = round(net_flow / total_turnover * 100.0, 2) if total_turnover > 0 else 0.0
+                items.append(
+                    {
+                        "code": name,
+                        "name": name,
+                        "pct_chg": round(pct_chg, 2),
+                        "inflow": inflow,
+                        "outflow": outflow,
+                        "net_flow": net_flow,
+                        "net_ratio": net_ratio,
+                        "turnover": round(total_turnover, 2),
+                        "company_count": company_cnt,
+                        "lead_stock": lead_stock,
+                        "lead_pct": lead_pct,
+                        "quadrant": _classify_quadrant(pct_chg, net_flow),
+                    }
+                )
+            if items:
+                return items, total_pages
+        except Exception:
+            if attempt < retries - 1:
+                time.sleep(0.2 * (attempt + 1))
+    return [], 1
 
 
 def _fetch_sina_sector_fallback(sess: requests.Session, fenlei: int) -> list[dict[str, Any]]:
@@ -227,7 +257,7 @@ def _fetch_sina_sector_fallback(sess: requests.Session, fenlei: int) -> list[dic
     for asc in (0, 1):
         url = (
             f"https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/"
-            f"MoneyFlow.ssl_bkzj_bk?page=1&num=60&sort=netamount&asc={asc}&fenlei={fenlei}"
+            f"MoneyFlow.ssl_bkzj_bk?page=1&num=200&sort=netamount&asc={asc}&fenlei={fenlei}"
         )
         try:
             resp = sess.get(url, timeout=12)
@@ -266,38 +296,93 @@ def _fetch_sina_sector_fallback(sess: requests.Session, fenlei: int) -> list[dic
 
 
 def _get_cn_industries_and_concepts() -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
-    """Fetch realtime CN industry and concept fund flows (Tonghuashun primary, Sina fallback)."""
+    """Fetch complete realtime CN industry (90) and concept (all pages) fund flows."""
     sess = _direct_session()
-    source = "同花顺实时资金流"
+    now_ts = time.time()
     industries: list[dict[str, Any]] = []
     concepts: list[dict[str, Any]] = []
+    ind_src = "同花顺"
+    con_src = "同花顺"
 
-    try:
-        ind_map: dict[str, dict[str, Any]] = {}
-        for page in (1, 2):
-            for row in _fetch_ths_board_page(sess, "hyzjl", "desc", page):
-                ind_map[row["name"]] = row
+    # 1. Industries: desc page 1 + asc page 1 covers all 90 industries cleanly
+    ind_map: dict[str, dict[str, Any]] = {}
+    for order in ("desc", "asc"):
+        rows, _ = _fetch_ths_board_page_with_retry(sess, "hyzjl", order, 1)
+        for row in rows:
+            ind_map[row["name"]] = row
+        time.sleep(0.14)
+
+    if len(ind_map) >= 70:
         industries = sorted(ind_map.values(), key=lambda x: x["net_flow"], reverse=True)
-    except Exception:
+        _LAST_GOOD_CN_BOARDS["industries"] = (now_ts, industries)
+    elif _LAST_GOOD_CN_BOARDS.get("industries") and (now_ts - _LAST_GOOD_CN_BOARDS["industries"][0] < 300):
+        industries = _LAST_GOOD_CN_BOARDS["industries"][1]
+        ind_src = "同花顺(缓存)"
+    else:
         industries = _fetch_sina_sector_fallback(sess, fenlei=0)
-        source = "新浪财经实时资金流"
+        ind_src = "新浪"
 
-    try:
-        con_map: dict[str, dict[str, Any]] = {}
-        for order in ("desc", "asc"):
-            for row in _fetch_ths_board_page(sess, "gnzjl", order, 1):
-                if any(k in row["name"] for k in CONCEPT_NOISE_KEYWORDS):
-                    continue
-                con_map[row["name"]] = row
+    # 2. Concepts: fetch ALL pages + asc back-fill + tradezdf extremes
+    con_map: dict[str, dict[str, Any]] = {}
+    first_rows, total_pages = _fetch_ths_board_page_with_retry(sess, "gnzjl", "desc", 1)
+    for row in first_rows:
+        if not any(k in row["name"] for k in CONCEPT_NOISE_KEYWORDS):
+            con_map[row["name"]] = row
+
+    has_empty_page = False
+    if first_rows and total_pages > 1:
+        for page in range(2, min(total_pages + 1, 15)):
+            time.sleep(0.14)
+            p_rows, _ = _fetch_ths_board_page_with_retry(sess, "gnzjl", "desc", page)
+            if not p_rows:
+                has_empty_page = True
+            for row in p_rows:
+                if not any(k in row["name"] for k in CONCEPT_NOISE_KEYWORDS):
+                    con_map[row["name"]] = row
+
+    if has_empty_page or len(con_map) < 350:
+        for asc_p in (1, 2):
+            time.sleep(0.14)
+            a_rows, _ = _fetch_ths_board_page_with_retry(sess, "gnzjl", "asc", asc_p)
+            for row in a_rows:
+                if not any(k in row["name"] for k in CONCEPT_NOISE_KEYWORDS):
+                    con_map[row["name"]] = row
+        for zdf_ord in ("desc", "asc"):
+            time.sleep(0.14)
+            z_rows, _ = _fetch_ths_board_page_with_retry(sess, "gnzjl", zdf_ord, 1, field="tradezdf")
+            for row in z_rows:
+                if not any(k in row["name"] for k in CONCEPT_NOISE_KEYWORDS):
+                    con_map.setdefault(row["name"], row)
+        for zdf_p in (1, 2, 3):
+            time.sleep(0.14)
+            z_rows2, _ = _fetch_ths_board_page_with_retry(sess, "gnzjl", "desc", zdf_p, field="zdf")
+            for row in z_rows2:
+                if not any(k in row["name"] for k in CONCEPT_NOISE_KEYWORDS):
+                    con_map.setdefault(row["name"], row)
+
+    prev_snap = _LAST_GOOD_CN_BOARDS.get("concepts")
+    has_fresh_snap = bool(prev_snap and (now_ts - prev_snap[0] < 300))
+
+    if (has_empty_page or len(con_map) < 350) and has_fresh_snap and len(con_map) >= 150:
+        # Overlay partial fresh quotes onto the recent full snapshot to cover intermittent empty THS pages
+        merged = {r["name"]: r for r in prev_snap[1] if not any(k in r["name"] for k in CONCEPT_NOISE_KEYWORDS)}
+        merged.update(con_map)
+        concepts = sorted(merged.values(), key=lambda x: x["net_flow"], reverse=True)
+        _LAST_GOOD_CN_BOARDS["concepts"] = (now_ts, concepts)
+    elif len(con_map) >= 250:
         concepts = sorted(con_map.values(), key=lambda x: x["net_flow"], reverse=True)
-    except Exception:
+        _LAST_GOOD_CN_BOARDS["concepts"] = (now_ts, concepts)
+    elif has_fresh_snap:
+        concepts = prev_snap[1]
+        con_src = "同花顺(缓存)"
+    else:
         raw_con = _fetch_sina_sector_fallback(sess, fenlei=1)
         concepts = [
             row for row in raw_con if not any(k in row["name"] for k in CONCEPT_NOISE_KEYWORDS)
         ]
-        if source == "同花顺实时资金流":
-            source = "同花顺行业 + 新浪概念"
+        con_src = "新浪"
 
+    source = f"{ind_src}行业 + {con_src}题材" if ind_src != con_src else f"{ind_src}实时资金流"
     return industries, concepts, source
 
 
