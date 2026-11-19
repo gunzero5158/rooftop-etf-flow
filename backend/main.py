@@ -308,4 +308,7 @@ if FRONTEND_DIR.exists():
     @app.get("/")
     def serve_index() -> FileResponse:
         """Serve the Rooftop ETF Flow dashboard SPA."""
-        return FileResponse(str(FRONTEND_DIR / "index.html"))
+        return FileResponse(
+            str(FRONTEND_DIR / "index.html"),
+            headers={"Cache-Control": "no-cache, must-revalidate"},
+        )

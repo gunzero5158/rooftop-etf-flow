@@ -20,7 +20,18 @@
     rtQMode: "matrix", // "matrix" | "scatter"
     rtAutoRefresh: false,
     rtTimer: null,
+    colorScheme: "red-up", // "red-up" (红涨绿跌) | "green-up" (绿涨红跌)
+    detailPayload: null,
   };
+
+  try {
+    const savedScheme = localStorage.getItem("rooftop_color_scheme");
+    if (savedScheme === "red-up" || savedScheme === "green-up") {
+      state.colorScheme = savedScheme;
+    }
+  } catch {
+    // Ignore storage access errors
+  }
 
   const charts = {
     timeseries: null,
@@ -34,19 +45,19 @@
     rtEtfs: null,
   };
 
-  function isPositiveRed(market) {
-    return market === "CN";
+  function isPositiveRed() {
+    return state.colorScheme !== "green-up";
   }
 
-  function colorForVal(val, market) {
-    if (val > 0) return isPositiveRed(market) ? "#f23645" : "#089981";
-    if (val < 0) return isPositiveRed(market) ? "#089981" : "#f23645";
+  function colorForVal(val) {
+    if (val > 0) return isPositiveRed() ? "#f23645" : "#089981";
+    if (val < 0) return isPositiveRed() ? "#089981" : "#f23645";
     return "#8b98aa";
   }
 
-  function classForVal(val, market) {
-    if (val > 0) return isPositiveRed(market) ? "text-[#f23645]" : "text-[#089981]";
-    if (val < 0) return isPositiveRed(market) ? "text-[#089981]" : "text-[#f23645]";
+  function classForVal(val) {
+    if (val > 0) return isPositiveRed() ? "text-[#f23645]" : "text-[#089981]";
+    if (val < 0) return isPositiveRed() ? "text-[#089981]" : "text-[#f23645]";
     return "text-[#8b98aa]";
   }
 
@@ -171,9 +182,13 @@
     const badge = document.getElementById("kpi-stance-badge");
     badge.textContent = s.stance_label;
     if (s.stance_tone === "bullish") {
-      badge.className = "badge-tag bg-[#f23645]/15 text-[#f23645] border border-[#f23645]/35";
+      badge.className = isPositiveRed()
+        ? "badge-tag bg-[#f23645]/15 text-[#f23645] border border-[#f23645]/35"
+        : "badge-tag bg-[#089981]/15 text-[#089981] border border-[#089981]/35";
     } else if (s.stance_tone === "caution" || s.stance_tone === "bearish") {
-      badge.className = "badge-tag bg-[#089981]/15 text-[#089981] border border-[#089981]/35";
+      badge.className = isPositiveRed()
+        ? "badge-tag bg-[#089981]/15 text-[#089981] border border-[#089981]/35"
+        : "badge-tag bg-[#f23645]/15 text-[#f23645] border border-[#f23645]/35";
     } else {
       badge.className = "badge-tag bg-[#2dd4bf]/15 text-[#5eead4] border border-[#2dd4bf]/45";
     }
@@ -1299,17 +1314,34 @@
     }
   }
 
+  function setColorScheme(scheme) {
+    state.colorScheme = scheme === "green-up" ? "green-up" : "red-up";
+    try {
+      localStorage.setItem("rooftop_color_scheme", state.colorScheme);
+    } catch {
+      // Ignore storage write errors
+    }
+    document.querySelectorAll(".color-scheme-group .seg-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.scheme === state.colorScheme);
+    });
+    if (state.data) {
+      renderAll();
+    }
+    if (state.rtData) {
+      renderRealtimeAll();
+    }
+    const detailModal = document.getElementById("modal-detail");
+    if (detailModal && detailModal.classList.contains("open") && state.detailPayload) {
+      renderDetailPayload(state.detailPayload);
+    }
+  }
+
   // ==================== DETAIL MODAL & CONTROLS ====================
 
-  async function openDetailModal(code) {
-    const modal = document.getElementById("modal-detail");
-    modal.classList.add("open");
-    const res = await fetch(`/api/v1/etf-flow/etf/${state.market}/${encodeURIComponent(code)}`);
-    if (!res.ok) return;
-    const payload = await res.json();
+  function renderDetailPayload(payload) {
     const meta = payload.meta;
     const hist = payload.history || [];
-    const unit = state.market === "CN" ? "亿元" : "百万美元";
+    const unit = (meta.market || state.market) === "CN" ? "亿元" : "百万美元";
 
     document.getElementById("detail-title").textContent = `${meta.name} (${meta.code})`;
     document.getElementById("detail-sub").textContent =
@@ -1380,7 +1412,22 @@
     );
   }
 
+  async function openDetailModal(code) {
+    const modal = document.getElementById("modal-detail");
+    modal.classList.add("open");
+    const res = await fetch(`/api/v1/etf-flow/etf/${state.market}/${encodeURIComponent(code)}`);
+    if (!res.ok) return;
+    const payload = await res.json();
+    state.detailPayload = payload;
+    renderDetailPayload(payload);
+  }
+
   function wireEvents() {
+    document.querySelectorAll(".color-scheme-group .seg-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.scheme === state.colorScheme);
+      btn.addEventListener("click", () => setColorScheme(btn.dataset.scheme));
+    });
+
     document.querySelectorAll("#view-mode-switch .mode-hero-card").forEach((card) => {
       card.addEventListener("click", () => switchViewMode(card.dataset.view));
     });
