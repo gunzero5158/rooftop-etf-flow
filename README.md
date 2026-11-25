@@ -1,6 +1,6 @@
 # Rooftop ETF Flow（天台ETF资金流）
 
-> 版本：`v0.6.0` | 「天台工具（Rooftop Tools）」系列量化观察模块之一
+> 版本：`v0.7.0` | 「天台工具（Rooftop Tools）」系列量化观察模块之一
 
 结合 **盘后官方基金份额净申赎** 与 **盘中实时资金流向（分行业 · 分题材）** 双模式监控 A 股与美股市场资金偏好、国家队动向及板块轮动主线。
 
@@ -38,3 +38,8 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ### 4. 公网部署安全配置（可选环境变量）
 - `ROOFTOP_ADMIN_TOKEN`：设置后，调用「同步数据」（`POST /api/v1/etf-flow/sync`）与「新增标的」（`POST /api/v1/etf-flow/universe/add`）需验证请求头 `X-Admin-Token`（前端会自动弹窗输入）；本地开发不设置此变量即可免密操作。
 - `ROOFTOP_RT_FORCE_COOLDOWN`：实时接口 `force=true` 全局强刷冷却时间（单位秒，默认 `15.0`），配合单飞并发锁防止公网访客高频强刷触发上游限流。
+
+### 5. Cloudflare Workers + GitHub Actions 自动公网部署
+- 边缘网关代码位于 `cloudflare/worker.js`（配 `wrangler.jsonc`），盘后分析快照通过 `export_cf_snapshot.py` 存入 Cloudflare KV，实时 A/美股流向在 Cloudflare V8 边缘节点直连计算并缓存。
+- `.github/workflows/deploy-cloudflare.yml` 监听 `main` 分支代码推送自动部署；`.github/workflows/sync-postmarket.yml` 按北京时间每日 `08:40 / 17:30 / 21:00` 自动增量抓取盘后数据并更新 Cloudflare KV。
+- 在 GitHub 仓库 Secrets 中配置 `CLOUDFLARE_API_TOKEN`（权限：`Workers Scripts: Edit` + `Workers KV Storage: Edit`）、`CLOUDFLARE_ACCOUNT_ID` 与 `CLOUDFLARE_KV_NAMESPACE_ID` 即可全自动运行。

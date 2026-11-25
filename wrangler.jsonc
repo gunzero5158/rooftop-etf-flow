@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rooftop-etf-flow",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2026-11-25",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./frontend",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "kv_namespaces": [
+    {
+      "binding": "ETF_KV",
+      "id": "c54cf96ef97e480bbb9117fc42929b0a"
+    }
+  ],
+  "vars": {
+    "ROOFTOP_RT_FORCE_COOLDOWN": "15",
+    "GITHUB_REPO": "gunzero5158/rooftop-etf-flow"
+  },
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  }
+}

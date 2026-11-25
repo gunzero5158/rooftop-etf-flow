@@ -11,6 +11,8 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 data/*.sqlite*
+data/cf_kv_bulk.json
+.wrangler/
 
 # Environment & Logs
 .env
