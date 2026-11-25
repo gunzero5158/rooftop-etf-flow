@@ -7,6 +7,8 @@
     search: "",
     sortKey: "net_flow",
     sortDesc: true,
+    tsFlowMode: "core", // "core" | "market_broad" | "sector"
+    pmSectorMode: "group", // "group" | "cluster" | "etf"
     pmQMode: "matrix", // "matrix" | "scatter"
     data: null,
 
@@ -129,7 +131,22 @@
     document.getElementById("unit-badge-1").textContent = d.unit;
     document.getElementById("unit-badge-2").textContent = d.unit;
     document.getElementById("lbl-core-title").textContent =
-      d.market === "CN" ? "核心护盘宽基 (300/50/500/1000)" : "核心配置宽基 (SPY/VOO/IVV)";
+      d.market === "CN" ? "国家队护盘宽基 (300/50/500/1000)" : "核心配置宽基 (SPY/VOO/IVV)";
+    const mktBroadTitleEl = document.getElementById("lbl-mkt-broad-title");
+    if (mktBroadTitleEl) {
+      mktBroadTitleEl.textContent =
+        d.market === "CN" ? "市场化宽基 (A500/双创/2000)" : "成长与中小盘宽基 (QQQ/IWM/DIA)";
+    }
+    const clsTitleEl = document.getElementById("chart-clusters-title");
+    const clsSubEl = document.getElementById("chart-clusters-sub");
+    if (clsTitleEl && clsSubEl) {
+      clsTitleEl.textContent =
+        d.market === "CN" ? "宽基阵营拆解：国家队护盘簇 vs 市场化宽基簇" : "美股宽基簇净流向对比";
+      clsSubEl.textContent =
+        d.market === "CN"
+          ? "★ 为国家队重仓护盘核心簇(300/50/500/1000)，其余为市场化配置与交易宽基簇"
+          : "★ 为标普500核心配置簇(SPY/VOO/IVV)，其余为纳指成长与道指罗素簇";
+    }
 
     renderIndices(d);
     renderKpis(d);
@@ -171,9 +188,17 @@
     const s = d.summary;
     const u = d.unit;
 
+    const mktBroadVal =
+      s.total_market_broad_flow !== undefined
+        ? s.total_market_broad_flow
+        : Number((s.total_broad_flow - s.total_core_flow).toFixed(2));
     const elBroad = document.getElementById("kpi-broad-flow");
-    elBroad.textContent = fmtSigned(s.total_broad_flow, 2, ` ${u}`);
-    elBroad.className = `text-2xl font-bold mt-1.5 tabular-nums ${classForVal(s.total_broad_flow, d.market)}`;
+    elBroad.textContent = fmtSigned(mktBroadVal, 2, ` ${u}`);
+    elBroad.className = `text-2xl font-bold mt-1.5 tabular-nums ${classForVal(mktBroadVal, d.market)}`;
+    const elBroadSub = document.getElementById("kpi-broad-sub");
+    if (elBroadSub) {
+      elBroadSub.textContent = `全宽基合计净流向：${fmtSigned(s.total_broad_flow, 2, ` ${u}`)}`;
+    }
 
     const elCore = document.getElementById("kpi-core-flow");
     elCore.textContent = fmtSigned(s.total_core_flow, 2, ` ${u}`);
@@ -183,20 +208,20 @@
     badge.textContent = s.stance_label;
     if (s.stance_tone === "bullish") {
       badge.className = isPositiveRed()
-        ? "badge-tag bg-[#f23645]/15 text-[#f23645] border border-[#f23645]/35"
-        : "badge-tag bg-[#089981]/15 text-[#089981] border border-[#089981]/35";
+        ? "badge-tag bg-[#f23645]/15 text-[#f23645] border border-[#f23645]/35 shrink-0"
+        : "badge-tag bg-[#089981]/15 text-[#089981] border border-[#089981]/35 shrink-0";
     } else if (s.stance_tone === "caution" || s.stance_tone === "bearish") {
       badge.className = isPositiveRed()
-        ? "badge-tag bg-[#089981]/15 text-[#089981] border border-[#089981]/35"
-        : "badge-tag bg-[#f23645]/15 text-[#f23645] border border-[#f23645]/35";
+        ? "badge-tag bg-[#089981]/15 text-[#089981] border border-[#089981]/35 shrink-0"
+        : "badge-tag bg-[#f23645]/15 text-[#f23645] border border-[#f23645]/35 shrink-0";
     } else {
-      badge.className = "badge-tag bg-[#2dd4bf]/15 text-[#5eead4] border border-[#2dd4bf]/45";
+      badge.className = "badge-tag bg-[#2dd4bf]/15 text-[#5eead4] border border-[#2dd4bf]/45 shrink-0";
     }
 
     const anchorEl = document.getElementById("kpi-anchor-point");
     if (s.weighted_anchor_point !== null && s.weighted_anchor_point !== undefined) {
       const idxName = d.market === "CN" ? "沪深300" : "标普500";
-      let txt = `正流入加权点位锚：${idxName} ${fmtNum(s.weighted_anchor_point, 2)}`;
+      let txt = `护盘点位锚：${idxName} ${fmtNum(s.weighted_anchor_point, 2)}`;
       if (d.market === "CN" && s.weighted_alt_point) {
         txt += ` / 上证 ${fmtNum(s.weighted_alt_point, 2)}`;
       }
@@ -208,7 +233,12 @@
     const elSector = document.getElementById("kpi-sector-flow");
     elSector.textContent = fmtSigned(s.total_sector_flow, 2, ` ${u}`);
     elSector.className = `text-2xl font-bold mt-1.5 tabular-nums ${classForVal(s.total_sector_flow, d.market)}`;
-    document.getElementById("kpi-macro-sub").textContent = `跨境/宏观避险锚净流入：${fmtSigned(s.total_macro_flow, 2, ` ${u}`)}`;
+    const secCountTxt =
+      s.sector_total_count !== undefined
+        ? `净流入板块 ${s.sector_in_count}/${s.sector_total_count} 个 · `
+        : "";
+    document.getElementById("kpi-macro-sub").textContent =
+      `${secCountTxt}跨境/避险锚：${fmtSigned(s.total_macro_flow, 2, ` ${u}`)}`;
 
     const elLarge = document.getElementById("kpi-large-flow");
     elLarge.textContent = fmtSigned(s.large_flow, 1, u);
@@ -219,8 +249,9 @@
     elSmall.className = `text-lg font-bold tabular-nums ${classForVal(s.small_growth_flow, d.market)}`;
 
     const styleEl = document.getElementById("kpi-style-verdict");
-    styleEl.textContent = s.style_summary;
-    styleEl.title = s.style_summary;
+    const shortVerdict = s.style_short || s.style_summary;
+    styleEl.textContent = shortVerdict;
+    styleEl.title = s.style_summary || shortVerdict;
   }
 
   function renderInsights(d, targetId, titleColorClass = "text-[#5eead4]") {
@@ -244,14 +275,45 @@
     const ts = d.time_series || [];
     const dates = ts.map((x) => x.trade_date);
     const benchCloses = ts.map((x) => x.bench_close);
-    const broadFlows = ts.map((x) => ({
-      value: x.broad_flow,
-      itemStyle: { color: colorForVal(x.broad_flow, d.market), borderRadius: x.broad_flow >= 0 ? [3, 3, 0, 0] : [0, 0, 3, 3] },
-    }));
-    const coreFlows = ts.map((x) => x.core_flow);
 
-    const benchName = d.market === "CN" ? "沪深300点位" : "标普500点位";
-    document.getElementById("chart-ts-title").textContent = `${benchName} vs 宽基每日资金净流向（近60交易日）`;
+    const isCN = d.market === "CN";
+    const benchName = isCN ? "沪深300点位" : "标普500点位";
+    const coreLabel = isCN ? "国家队护盘核心" : "标普核心配置";
+    const mktBroadLabel = isCN ? "市场化宽基(A500/双创)" : "成长与中小盘宽基";
+    const secLabel = "各板块合计流向";
+
+    let barSeriesName = coreLabel;
+    let lineSeriesName = secLabel;
+    let barRaw = ts.map((x) => x.core_flow ?? 0);
+    let lineRaw = ts.map((x) => x.sector_flow ?? 0);
+    let subText = isCN
+      ? "剔除A500/双创干扰，柱图纯看国家队重仓宽基(300/50/500/1000)；虚线对比全市场各板块流向"
+      : "柱图纯看标普500三大旗舰配置盘(SPY/VOO/IVV)；虚线对比美股各行业与题材板块合计流向";
+
+    if (state.tsFlowMode === "market_broad") {
+      barSeriesName = mktBroadLabel;
+      lineSeriesName = coreLabel;
+      barRaw = ts.map((x) => x.market_broad_flow ?? Number(((x.broad_flow || 0) - (x.core_flow || 0)).toFixed(2)));
+      lineRaw = ts.map((x) => x.core_flow ?? 0);
+      subText = isCN
+        ? "柱图展示市场化活跃宽基(中证A500/双创成长/中证2000)；虚线对比国家队护盘核心流向"
+        : "柱图展示纳指100与罗素道指宽基(QQQ/IWM/DIA)；虚线对比标普500核心配置流向";
+    } else if (state.tsFlowMode === "sector") {
+      barSeriesName = secLabel;
+      lineSeriesName = coreLabel;
+      barRaw = ts.map((x) => x.sector_flow ?? 0);
+      lineRaw = ts.map((x) => x.core_flow ?? 0);
+      subText = "柱图展示全市场行业与题材板块 ETF 每日净流向合计；虚线对比核心护盘宽基流向";
+    }
+
+    const barData = barRaw.map((v) => ({
+      value: v,
+      itemStyle: { color: colorForVal(v, d.market), borderRadius: v >= 0 ? [3, 3, 0, 0] : [0, 0, 3, 3] },
+    }));
+
+    document.getElementById("chart-ts-title").textContent = `${benchName} vs ${barSeriesName}（近60交易日）`;
+    const subEl = document.getElementById("chart-ts-sub");
+    if (subEl) subEl.textContent = subText;
 
     const selectedDates = ts.filter((x) => x.in_selected_period).map((x) => x.trade_date);
     const markAreaData =
@@ -268,9 +330,9 @@
     if (d.summary.weighted_anchor_point) {
       markLineData.push({
         yAxis: d.summary.weighted_anchor_point,
-        name: "加权流入点位锚",
+        name: "护盘点位锚",
         lineStyle: { color: "#f59e0b", type: "dashed", width: 1.5 },
-        label: { formatter: `加权锚 ${d.summary.weighted_anchor_point}`, color: "#fbbf24", fontSize: 11 },
+        label: { formatter: `护盘锚 ${d.summary.weighted_anchor_point}`, color: "#fbbf24", fontSize: 11 },
       });
     }
 
@@ -286,17 +348,21 @@
             if (!params || !params.length) return "";
             const idx = params[0].dataIndex;
             const row = ts[idx];
+            const mktB =
+              row.market_broad_flow !== undefined
+                ? row.market_broad_flow
+                : Number(((row.broad_flow || 0) - (row.core_flow || 0)).toFixed(2));
             return `
               <div style="font-weight:600;margin-bottom:4px;">${row.trade_date}</div>
               <div>${benchName}：<b>${row.bench_close}</b> (${fmtSigned(row.bench_pct, 2, "%")})</div>
-              <div>全宽基净流向：<b>${fmtSigned(row.broad_flow, 2, " " + d.unit)}</b></div>
-              <div>核心护盘/配置流向：<b>${fmtSigned(row.core_flow, 2, " " + d.unit)}</b></div>
-              <div>行业题材合计流向：<b>${fmtSigned(row.sector_flow, 2, " " + d.unit)}</b></div>
+              <div>${coreLabel}：<b>${fmtSigned(row.core_flow, 2, " " + d.unit)}</b></div>
+              <div>${mktBroadLabel}：<b>${fmtSigned(mktB, 2, " " + d.unit)}</b></div>
+              <div>${secLabel}：<b>${fmtSigned(row.sector_flow, 2, " " + d.unit)}</b></div>
             `;
           },
         },
         legend: {
-          data: [benchName, "全宽基净流向", "核心护盘/配置"],
+          data: [benchName, barSeriesName, lineSeriesName],
           textStyle: { color: "#8b98aa", fontSize: 11 },
           top: 0,
         },
@@ -326,17 +392,17 @@
         ],
         series: [
           {
-            name: "全宽基净流向",
+            name: barSeriesName,
             type: "bar",
             itemStyle: { color: "#8b98aa" },
-            data: broadFlows,
+            data: barData,
             barMaxWidth: 14,
             markArea: { silent: true, data: markAreaData },
           },
           {
-            name: "核心护盘/配置",
+            name: lineSeriesName,
             type: "line",
-            data: coreFlows,
+            data: lineRaw,
             smooth: 0.25,
             showSymbol: false,
             itemStyle: { color: "#2dd4bf" },
@@ -364,7 +430,7 @@
     if (!chart) return;
 
     const clusters = [...(d.broad_clusters || [])].reverse();
-    const names = clusters.map((c) => c.cluster_name);
+    const names = clusters.map((c) => (c.national_team_core ? `★ ${c.cluster_name}` : c.cluster_name));
     const values = clusters.map((c) => ({
       value: c.net_flow,
       itemStyle: { color: colorForVal(c.net_flow, d.market), borderRadius: c.net_flow >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4] },
@@ -380,8 +446,13 @@
           textStyle: { color: "#d8e1ea", fontSize: 12 },
           formatter: (params) => {
             const c = clusters[params[0].dataIndex];
+            const roleTag = c.national_team_core
+              ? d.market === "CN"
+                ? '<span style="color:#fbbf24;">[★ 国家队护盘核心簇]</span>'
+                : '<span style="color:#fbbf24;">[★ 核心配置宽基簇]</span>'
+              : '<span style="color:#94a3b8;">[市场化宽基簇]</span>';
             return `
-              <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(c.cluster_name)}</div>
+              <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(c.cluster_name)} ${roleTag}</div>
               <div>净流向：<b>${fmtSigned(c.net_flow, 2, " " + d.unit)}</b></div>
               <div>占总规模比：<b>${fmtSigned(c.flow_pct_aum, 2, "%")}</b></div>
               <div>加权涨跌：<b>${fmtSigned(c.avg_pct_chg, 2, "%")}</b></div>
@@ -390,7 +461,7 @@
             `;
           },
         },
-        grid: { left: 108, right: 48, top: 14, bottom: 26 },
+        grid: { left: 118, right: 48, top: 14, bottom: 26 },
         xAxis: {
           type: "value",
           splitLine: { lineStyle: { color: "rgba(148,163,184,0.1)" } },
@@ -603,27 +674,64 @@
     }
   }
 
+  function getActivePostMarketSectorList(d) {
+    if (state.pmSectorMode === "cluster" && d.sector_clusters) {
+      return d.sector_clusters;
+    }
+    if (state.pmSectorMode === "etf") {
+      return d.sector_rankings || [];
+    }
+    return d.sector_groups || d.sector_rankings || [];
+  }
+
   function renderSectorsChart(d) {
+    const items = getActivePostMarketSectorList(d);
+    const subEl = document.getElementById("chart-sectors-sub");
+    if (subEl) {
+      if (state.pmSectorMode === "cluster") {
+        subEl.textContent = "按宏观大赛道聚合，总览市场大类主线资金进出";
+      } else if (state.pmSectorMode === "etf") {
+        subEl.textContent = `展示监控池全部 ${items.length} 只代表性行业与题材 ETF 官方份额申赎`;
+      } else {
+        subEl.textContent = `覆盖全市场 ${items.length} 大细分行业与核心题材板块真实申赎流向`;
+      }
+    }
+
     renderHorizontalFlowChart(
       "sectors",
       "chart-sectors",
-      d.sector_rankings || [],
+      items,
       d.unit,
       d.market,
-      (s, unit) => `
-        <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(s.name)} (${s.code})</div>
-        <div>净流向：<b>${fmtSigned(s.net_flow, 2, " " + unit)}</b></div>
-        <div>区间涨跌：<b>${fmtSigned(s.period_pct_chg, 2, "%")}</b></div>
-        <div>占规模比：<b>${fmtSigned(s.flow_pct_aum, 2, "%")}</b></div>
-        <div>行为象限：<b>${s.quadrant}</b></div>
-      `
+      (s, unit) => {
+        const memberTxt =
+          s.member_names && s.member_names.length > 0
+            ? `<div style="color:#8b98aa;font-size:11px;margin-top:3px;">代表标的：${escapeHtml(s.member_names.join("、"))}</div>`
+            : "";
+        return `
+          <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(s.name)}</div>
+          <div>净流向：<b>${fmtSigned(s.net_flow, 2, " " + unit)}</b></div>
+          <div>区间涨跌：<b>${fmtSigned(s.period_pct_chg, 2, "%")}</b></div>
+          <div>占规模比：<b>${fmtSigned(s.flow_pct_aum, 2, "%")}</b> (${fmtNum(s.latest_aum, 1)} ${unit})</div>
+          <div>行为象限：<b>${s.quadrant}</b></div>
+          ${memberTxt}
+        `;
+      },
+      "split",
+      30
     );
   }
 
   function renderQuadrantChart(d) {
-    renderQuadrantMatrix("pm-quadrant-matrix", d.sector_rankings || [], d.unit, d.market, {
+    const list = getActivePostMarketSectorList(d);
+    renderQuadrantMatrix("pm-quadrant-matrix", list, d.unit, d.market, {
       getPct: (x) => x.period_pct_chg || 0,
-      getSubTag: (x) => (x.category === "theme" ? "题材" : "行业"),
+      getSubTag: (x) =>
+        state.pmSectorMode === "cluster"
+          ? `${x.etf_count || ""}只`
+          : x.category === "theme"
+            ? "题材"
+            : "行业",
       onItemClick: (code) => openDetailModal(code),
     });
 
@@ -641,7 +749,6 @@
     if (!chart) return;
     chart.resize();
 
-    const list = d.sector_rankings || [];
     const maxAum = Math.max(...list.map((x) => x.latest_aum || 1), 1);
 
     const scatterData = list.map((x) => ({
@@ -1515,6 +1622,28 @@
     document.getElementById("rt-search-input").addEventListener("input", (e) => {
       state.rtSearch = e.target.value;
       renderRealtimeTable();
+    });
+
+    // Post-market timeseries & sector dimension switches
+    document.querySelectorAll("#ts-flow-mode .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#ts-flow-mode .seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.tsFlowMode = btn.dataset.tsmode;
+        if (state.data) renderTimeSeriesChart(state.data);
+      });
+    });
+
+    document.querySelectorAll("#pm-sector-mode .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#pm-sector-mode .seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.pmSectorMode = btn.dataset.smode;
+        if (state.data) {
+          renderSectorsChart(state.data);
+          renderQuadrantChart(state.data);
+        }
+      });
     });
 
     // Quadrant view switches (matrix vs scatter)

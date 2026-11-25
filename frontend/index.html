@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111822'/%3E%3Cpath d='M7 7v18h18M22.7 12l-5.1 5.2-2.8-2.7L11 18.3' fill='none' stroke='%232dd4bf' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=0.4.1" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.5.0" />
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -135,30 +135,30 @@
       <!-- Summary KPI Cards -->
       <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div class="card-panel card-panel-score p-4">
+          <div class="text-xs text-[#a8b5c7] flex items-center justify-between gap-1">
+            <span id="lbl-core-title" class="truncate">国家队护盘核心宽基</span>
+            <span id="kpi-stance-badge" class="badge-tag bg-[#1c2030] text-[#d8e1ea] border border-[#263244] shrink-0">--</span>
+          </div>
+          <div id="kpi-core-flow" class="text-2xl font-bold mt-1.5 tabular-nums">--</div>
+          <div class="text-xs text-[#8b98aa] mt-1.5 tabular-nums truncate" id="kpi-anchor-point">加权买入点位锚：--</div>
+        </div>
+
+        <div class="card-panel p-4">
           <div class="text-xs text-[#a8b5c7] flex items-center justify-between">
-            <span>全宽基 ETF 净流向</span>
+            <span id="lbl-mkt-broad-title">市场化宽基 (A500/双创/2000)</span>
             <span id="unit-badge-1" class="text-[11px] text-[#787b86]">亿元</span>
           </div>
           <div id="kpi-broad-flow" class="text-2xl font-bold mt-1.5 tabular-nums">--</div>
-          <div class="text-xs text-[#8b98aa] mt-1.5" id="kpi-broad-sub">覆盖全部主要宽基指数簇</div>
+          <div class="text-xs text-[#8b98aa] mt-1.5 tabular-nums" id="kpi-broad-sub">全宽基合计净流向：--</div>
         </div>
 
         <div class="card-panel p-4">
           <div class="text-xs text-[#a8b5c7] flex items-center justify-between">
-            <span id="lbl-core-title">核心护盘宽基净流向</span>
-            <span id="kpi-stance-badge" class="badge-tag bg-[#1c2030] text-[#d8e1ea] border border-[#263244]">--</span>
-          </div>
-          <div id="kpi-core-flow" class="text-2xl font-bold mt-1.5 tabular-nums">--</div>
-          <div class="text-xs text-[#8b98aa] mt-1.5 tabular-nums" id="kpi-anchor-point">加权买入点位锚：--</div>
-        </div>
-
-        <div class="card-panel p-4">
-          <div class="text-xs text-[#a8b5c7] flex items-center justify-between">
-            <span>行业 / 题材 ETF 净流向</span>
+            <span>全市场各板块 ETF 净流向</span>
             <span id="unit-badge-2" class="text-[11px] text-[#787b86]">亿元</span>
           </div>
           <div id="kpi-sector-flow" class="text-2xl font-bold mt-1.5 tabular-nums">--</div>
-          <div class="text-xs text-[#8b98aa] mt-1.5" id="kpi-macro-sub">宏观避险锚：--</div>
+          <div class="text-xs text-[#8b98aa] mt-1.5 tabular-nums truncate" id="kpi-macro-sub">板块净流入占比：--</div>
         </div>
 
         <div class="card-panel p-4">
@@ -171,7 +171,7 @@
             <span class="text-xs text-[#787b86]">/</span>
             <span id="kpi-small-flow" class="text-lg font-bold tabular-nums">--</span>
           </div>
-          <div class="text-xs text-[#8b98aa] mt-1.5 truncate" id="kpi-style-verdict">--</div>
+          <div class="text-xs text-[#8b98aa] mt-1.5 tabular-nums" id="kpi-style-verdict">--</div>
         </div>
       </section>
 
@@ -182,7 +182,7 @@
             <span class="w-1 h-4 bg-[#2dd4bf] rounded-full"></span>
             大盘点位 × 资金流向智能复盘总结
           </h2>
-          <span class="text-[11px] text-[#8b98aa]">结合同期指数点位、涨跌与官方份额变动自动提炼</span>
+          <span class="text-[11px] text-[#8b98aa]">结合国家队护盘宽基、市场化宽基与全市场板块份额变动自动提炼</span>
         </div>
         <div id="insights-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs sm:text-[13px]"></div>
       </section>
@@ -190,10 +190,15 @@
       <!-- Chart Row 1 -->
       <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div class="card-panel p-4 lg:col-span-7 flex flex-col">
-          <div class="flex items-center justify-between mb-2">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div>
-              <h3 class="text-sm font-bold text-white" id="chart-ts-title">大盘点位 vs 宽基每日资金净流向（近60交易日）</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5">高亮阴影区为当前选中周期，虚线为期间正流入加权买入点位锚</p>
+              <h3 class="text-sm font-bold text-white" id="chart-ts-title">沪深300点位 vs 国家队护盘核心净流向（近60交易日）</h3>
+              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-ts-sub">剔除A500/双创干扰，纯看国家队重仓护盘宽基(300/50/500/1000)；青色虚线对比全板块流向</p>
+            </div>
+            <div class="seg-group" id="ts-flow-mode">
+              <button class="seg-btn active" data-tsmode="core">护盘核心</button>
+              <button class="seg-btn" data-tsmode="market_broad">市场宽基</button>
+              <button class="seg-btn" data-tsmode="sector">各板块合计</button>
             </div>
           </div>
           <div id="chart-timeseries" class="w-full h-[330px]"></div>
@@ -202,8 +207,8 @@
         <div class="card-panel p-4 lg:col-span-5 flex flex-col">
           <div class="flex items-center justify-between mb-2">
             <div>
-              <h3 class="text-sm font-bold text-white">宽基指数簇（Cluster）净流向对比</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5">按跟踪指数合并同类旗舰 ETF，穿透资金分流假象</p>
+              <h3 class="text-sm font-bold text-white" id="chart-clusters-title">宽基阵营拆解：国家队护盘簇 vs 市场化宽基簇</h3>
+              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-clusters-sub">★ 为国家队重仓护盘核心簇，其余为市场化配置与交易宽基簇</p>
             </div>
           </div>
           <div id="chart-clusters" class="w-full h-[330px]"></div>
@@ -213,10 +218,15 @@
       <!-- Chart Row 2 -->
       <section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div class="card-panel p-4 lg:col-span-5 flex flex-col">
-          <div class="flex items-center justify-between mb-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
-              <h3 class="text-sm font-bold text-white">行业 / 题材 ETF 资金净流向排行</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5">识别增量主线吸金板块与资金撤离方向</p>
+              <h3 class="text-sm font-bold text-white">全市场各板块资金净流向排行</h3>
+              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-sectors-sub">覆盖全市场核心行业与热门题材板块真实申赎流向</p>
+            </div>
+            <div class="seg-group" id="pm-sector-mode">
+              <button class="seg-btn active" data-smode="group">细分板块</button>
+              <button class="seg-btn" data-smode="cluster">五大赛道</button>
+              <button class="seg-btn" data-smode="etf">单只ETF</button>
             </div>
           </div>
           <div id="chart-sectors" class="w-full h-[460px]"></div>
@@ -225,7 +235,7 @@
         <div class="card-panel p-4 lg:col-span-7 flex flex-col">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
-              <h3 class="text-sm font-bold text-white">涨跌幅 × 资金净流向 四象限轮动矩阵</h3>
+              <h3 class="text-sm font-bold text-white">各板块涨跌幅 × 资金净流向 四象限轮动矩阵</h3>
               <p class="text-[11px] text-[#8b98aa] mt-0.5">清晰区分主线共振、逆势抄底、逢高兑现与资金撤离四大资金行为</p>
             </div>
             <div class="seg-group" id="pm-quadrant-mode">
@@ -488,7 +498,7 @@
   </main>
 
   <footer class="zq-footer py-3.5 text-center text-xs">
-    Rooftop ETF Flow（天台ETF资金流）v0.4.1 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 每日 08:40/17:30/21:00 自动增量更新
+    Rooftop ETF Flow（天台ETF资金流）v0.5.0 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 每日 08:40/17:30/21:00 自动增量更新
   </footer>
 
   <!-- Toast Notification -->
@@ -584,6 +594,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=0.4.1"></script>
+  <script src="/static/app.js?v=0.5.0"></script>
 </body>
 </html>

@@ -55,6 +55,7 @@ def init_db() -> None:
                 market TEXT NOT NULL,
                 code TEXT NOT NULL,
                 name TEXT NOT NULL,
+                sector_name TEXT DEFAULT '',
                 exchange TEXT NOT NULL,
                 category TEXT NOT NULL,
                 cluster_id TEXT NOT NULL,
@@ -113,6 +114,9 @@ def init_db() -> None:
             );
             """
         )
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(etf_meta)").fetchall()}
+        if "sector_name" not in cols:
+            conn.execute("ALTER TABLE etf_meta ADD COLUMN sector_name TEXT DEFAULT '';")
     sync_meta_from_universe()
 
 
@@ -127,12 +131,13 @@ def sync_meta_from_universe() -> None:
                 conn.execute(
                     """
                     INSERT INTO etf_meta (
-                        market, code, name, exchange, category,
+                        market, code, name, sector_name, exchange, category,
                         cluster_id, cluster_name, style, national_team_core, updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(market, code) DO UPDATE SET
                         name = excluded.name,
+                        sector_name = excluded.sector_name,
                         exchange = excluded.exchange,
                         category = excluded.category,
                         cluster_id = excluded.cluster_id,
@@ -145,6 +150,7 @@ def sync_meta_from_universe() -> None:
                         market,
                         item["code"],
                         item["name"],
+                        item.get("sector_name", ""),
                         item.get("exchange", ""),
                         item["category"],
                         item["cluster_id"],

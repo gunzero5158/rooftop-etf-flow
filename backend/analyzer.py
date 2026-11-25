@@ -245,6 +245,7 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
                 {
                     "code": code,
                     "name": m["name"],
+                    "sector_name": (m.get("sector_name") or "").strip() or m["name"],
                     "exchange": m["exchange"],
                     "category": m["category"],
                     "cluster_id": m["cluster_id"],
@@ -305,13 +306,16 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
             agg_by_date: dict[str, dict[str, float]] = {}
             for r in flow_agg_rows:
                 d_entry = agg_by_date.setdefault(
-                    r["trade_date"], {"broad": 0.0, "core": 0.0, "sector": 0.0}
+                    r["trade_date"],
+                    {"broad": 0.0, "core": 0.0, "market_broad": 0.0, "sector": 0.0},
                 )
                 val = float(r["sum_flow"] or 0.0)
                 if r["category"] == "broad":
                     d_entry["broad"] += val
                     if r["national_team_core"]:
                         d_entry["core"] += val
+                    else:
+                        d_entry["market_broad"] += val
                 elif r["category"] in ("sector", "theme"):
                     d_entry["sector"] += val
 
@@ -319,7 +323,9 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
                 b_info = bench_map.get(d, {})
                 p_info = b_info.get(primary_bench_code, {})
                 a_info = b_info.get(alt_bench_code, {})
-                f_info = agg_by_date.get(d, {"broad": 0.0, "core": 0.0, "sector": 0.0})
+                f_info = agg_by_date.get(
+                    d, {"broad": 0.0, "core": 0.0, "market_broad": 0.0, "sector": 0.0}
+                )
                 ts_rows.append(
                     {
                         "trade_date": d,
@@ -329,6 +335,7 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
                         "alt_pct": round(a_info.get("pct_chg", 0.0), 2),
                         "broad_flow": round(f_info["broad"], 2),
                         "core_flow": round(f_info["core"], 2),
+                        "market_broad_flow": round(f_info["market_broad"], 2),
                         "sector_flow": round(f_info["sector"], 2),
                         "in_selected_period": d in set(flow_dates),
                     }
@@ -386,6 +393,7 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
     # Totals & style spread
     total_broad_flow = round(sum(e["net_flow"] for e in broad_items), 2)
     total_core_flow = round(sum(e["net_flow"] for e in broad_items if e["national_team_core"]), 2)
+    total_market_broad_flow = round(total_broad_flow - total_core_flow, 2)
     total_sector_flow = round(sum(e["net_flow"] for e in sector_items), 2)
     total_macro_flow = round(sum(e["net_flow"] for e in macro_items), 2)
 
@@ -423,31 +431,133 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
     bench_pct = primary_idx["period_pct_chg"] if primary_idx else 0.0
     stance_label, stance_tone = _judge_core_stance(market, period, bench_pct, total_core_flow)
 
-    # Style preference verdict
+    # Style preference verdict (concise for KPI card + full for narrative)
     style_diff = round(large_flow - small_growth_flow, 2)
     if large_flow > 0 and small_growth_flow > 0:
-        style_summary = (
-            f"大小盘宽基同步净流入（大盘权重 {large_flow:+.2f}{unit} vs 中小成长 {small_growth_flow:+.2f}{unit}），"
-            + ("大盘配置力度更强" if style_diff > 0 else "中小成长弹性更受青睐")
-        )
+        bias = "大盘占优" if style_diff > 0 else "中小成长占优"
+        style_short = f"剪刀差 {style_diff:+.1f}{unit} · 大小盘同流入，{bias}"
+        style_summary = f"大小盘宽基同步净流入，剪刀差 {style_diff:+.2f}{unit}，{bias}"
     elif large_flow < 0 and small_growth_flow < 0:
-        style_summary = (
-            f"大小盘宽基整体呈现净流出（大盘 {large_flow:+.2f}{unit} vs 中小成长 {small_growth_flow:+.2f}{unit}），"
-            "资金风险偏好偏谨慎"
-        )
+        bias = "大盘抗跌流出少" if style_diff > 0 else "中小流出相对少"
+        style_short = f"剪刀差 {style_diff:+.1f}{unit} · 大小盘同步净流出"
+        style_summary = f"大小盘宽基同步净流出，剪刀差 {style_diff:+.2f}{unit}（{bias}），风险偏好偏谨慎"
     elif style_diff > 0:
-        style_summary = (
-            f"资金显著偏向大盘蓝筹防御/配置（大盘 {large_flow:+.2f}{unit}，中小成长 {small_growth_flow:+.2f}{unit}）"
-        )
+        style_short = f"剪刀差 {style_diff:+.1f}{unit} · 偏向大盘蓝筹护盘"
+        style_summary = f"剪刀差达 {style_diff:+.2f}{unit}，资金显著流向大盘蓝筹防御配置、撤出中小成长"
     else:
-        style_summary = (
-            f"资金偏向中小盘/成长风格进攻（中小成长 {small_growth_flow:+.2f}{unit}，大盘权重 {large_flow:+.2f}{unit}）"
-        )
+        style_short = f"剪刀差 {style_diff:+.1f}{unit} · 偏向中小成长进攻"
+        style_summary = f"剪刀差为 {style_diff:+.2f}{unit}，资金偏向中小盘及双创成长进攻、兑现大盘权重"
 
-    # Sector rankings & quadrant breakdown
+    # Aggregate sector/theme ETFs by sector_name (board level) and by cluster_id (macro track level)
+    sec_grp_map: dict[str, dict[str, Any]] = {}
+    for s in sector_items:
+        sname = s["sector_name"]
+        g = sec_grp_map.setdefault(
+            sname,
+            {
+                "name": sname,
+                "code": s["code"],
+                "category": s["category"],
+                "cluster_id": s["cluster_id"],
+                "cluster_name": s["cluster_name"],
+                "net_flow": 0.0,
+                "latest_aum": 0.0,
+                "weighted_pct_sum": 0.0,
+                "etf_count": 0,
+                "members": [],
+                "member_names": [],
+            },
+        )
+        if s["latest_aum"] > g.get("_max_aum", -1.0):
+            g["_max_aum"] = s["latest_aum"]
+            g["code"] = s["code"]
+        g["net_flow"] += s["net_flow"]
+        g["latest_aum"] += s["latest_aum"]
+        g["weighted_pct_sum"] += s["period_pct_chg"] * (s["latest_aum"] if s["latest_aum"] > 0 else 1.0)
+        g["etf_count"] += 1
+        g["members"].append(s["code"])
+        g["member_names"].append(s["name"])
+
+    sector_groups: list[dict[str, Any]] = []
+    for g in sec_grp_map.values():
+        denom = g["latest_aum"] if g["latest_aum"] > 0 else max(g["etf_count"], 1)
+        avg_pct = round(g["weighted_pct_sum"] / denom, 2)
+        flow_pct = round(g["net_flow"] / g["latest_aum"] * 100.0, 2) if g["latest_aum"] > 0 else 0.0
+        net_f = round(g["net_flow"], 2)
+        sector_groups.append(
+            {
+                "code": g["code"],
+                "name": g["name"],
+                "category": g["category"],
+                "cluster_id": g["cluster_id"],
+                "cluster_name": g["cluster_name"],
+                "net_flow": net_f,
+                "latest_aum": round(g["latest_aum"], 2),
+                "flow_pct_aum": flow_pct,
+                "period_pct_chg": avg_pct,
+                "quadrant": _classify_quadrant(avg_pct, net_f),
+                "etf_count": g["etf_count"],
+                "members": g["members"],
+                "member_names": g["member_names"],
+            }
+        )
+    sector_groups.sort(key=lambda x: x["net_flow"], reverse=True)
+
+    sec_cls_map: dict[str, dict[str, Any]] = {}
+    for s in sector_items:
+        cid = s["cluster_id"]
+        c = sec_cls_map.setdefault(
+            cid,
+            {
+                "code": s["code"],
+                "name": s["cluster_name"],
+                "category": "sector",
+                "cluster_id": cid,
+                "cluster_name": s["cluster_name"],
+                "net_flow": 0.0,
+                "latest_aum": 0.0,
+                "weighted_pct_sum": 0.0,
+                "etf_count": 0,
+                "members": [],
+                "member_names": [],
+            },
+        )
+        c["net_flow"] += s["net_flow"]
+        c["latest_aum"] += s["latest_aum"]
+        c["weighted_pct_sum"] += s["period_pct_chg"] * (s["latest_aum"] if s["latest_aum"] > 0 else 1.0)
+        c["etf_count"] += 1
+        c["members"].append(s["code"])
+        c["member_names"].append(s["name"])
+
+    sector_clusters: list[dict[str, Any]] = []
+    for c in sec_cls_map.values():
+        denom = c["latest_aum"] if c["latest_aum"] > 0 else max(c["etf_count"], 1)
+        avg_pct = round(c["weighted_pct_sum"] / denom, 2)
+        flow_pct = round(c["net_flow"] / c["latest_aum"] * 100.0, 2) if c["latest_aum"] > 0 else 0.0
+        net_f = round(c["net_flow"], 2)
+        sector_clusters.append(
+            {
+                "code": c["code"],
+                "name": c["name"],
+                "category": "sector",
+                "cluster_id": c["cluster_id"],
+                "cluster_name": c["cluster_name"],
+                "net_flow": net_f,
+                "latest_aum": round(c["latest_aum"], 2),
+                "flow_pct_aum": flow_pct,
+                "period_pct_chg": avg_pct,
+                "quadrant": _classify_quadrant(avg_pct, net_f),
+                "etf_count": c["etf_count"],
+                "members": c["members"],
+                "member_names": c["member_names"],
+            }
+        )
+    sector_clusters.sort(key=lambda x: x["net_flow"], reverse=True)
+
+    # Sector rankings & quadrant breakdown (based on deduplicated sector_groups)
     sector_sorted = sorted(sector_items, key=lambda x: x["net_flow"], reverse=True)
-    top_inflows = sector_sorted[:5]
-    top_outflows = sorted(sector_items, key=lambda x: x["net_flow"])[:5]
+    top_inflows = sector_groups[:5]
+    top_outflows = sorted(sector_groups, key=lambda x: x["net_flow"])[:5]
 
     quadrants: dict[str, list[dict[str, Any]]] = {
         "主线共振": [],
@@ -455,8 +565,11 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
         "逆势抄底": [],
         "资金撤离": [],
     }
-    for s in sector_items:
+    for s in sector_groups:
         quadrants[s["quadrant"]].append(s)
+
+    sector_in_count = sum(1 for g in sector_groups if g["net_flow"] > 0)
+    sector_total_count = len(sector_groups)
 
     # Build structured narrative commentary
     insights = _build_narrative_insights(
@@ -469,11 +582,14 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
         alt_idx=alt_idx,
         total_broad_flow=total_broad_flow,
         total_core_flow=total_core_flow,
+        total_market_broad_flow=total_market_broad_flow,
         total_sector_flow=total_sector_flow,
         total_macro_flow=total_macro_flow,
         stance_label=stance_label,
         weighted_anchor_point=weighted_anchor_point,
         weighted_alt_point=weighted_alt_point,
+        large_flow=large_flow,
+        small_growth_flow=small_growth_flow,
         style_summary=style_summary,
         broad_clusters=broad_clusters,
         top_inflows=top_inflows,
@@ -495,10 +611,15 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
         "summary": {
             "total_broad_flow": total_broad_flow,
             "total_core_flow": total_core_flow,
+            "total_market_broad_flow": total_market_broad_flow,
             "total_sector_flow": total_sector_flow,
             "total_macro_flow": total_macro_flow,
+            "sector_in_count": sector_in_count,
+            "sector_total_count": sector_total_count,
             "large_flow": large_flow,
             "small_growth_flow": small_growth_flow,
+            "style_diff": style_diff,
+            "style_short": style_short,
             "stance_label": stance_label,
             "stance_tone": stance_tone,
             "weighted_anchor_point": weighted_anchor_point,
@@ -508,6 +629,8 @@ def get_dashboard_data(market: str = "CN", period: str = "5d") -> dict[str, Any]
         "insights": insights,
         "time_series": ts_rows,
         "broad_clusters": broad_clusters,
+        "sector_groups": sector_groups,
+        "sector_clusters": sector_clusters,
         "sector_rankings": sector_sorted,
         "top_inflows": top_inflows,
         "top_outflows": top_outflows,
@@ -529,11 +652,14 @@ def _build_narrative_insights(
     alt_idx: dict[str, Any] | None,
     total_broad_flow: float,
     total_core_flow: float,
+    total_market_broad_flow: float,
     total_sector_flow: float,
     total_macro_flow: float,
     stance_label: str,
     weighted_anchor_point: float | None,
     weighted_alt_point: float | None,
+    large_flow: float,
+    small_growth_flow: float,
     style_summary: str,
     broad_clusters: list[dict[str, Any]],
     top_inflows: list[dict[str, Any]],
@@ -594,26 +720,31 @@ def _build_narrative_insights(
     dip_names = "、".join(x["name"] for x in quadrants["逆势抄底"][:4]) or "暂无明显标的"
     tp_names = "、".join(x["name"] for x in quadrants["逢高兑现"][:4]) or "暂无明显标的"
 
+    mkt_broad_role = "市场化宽基（A500/双创/2000）" if market == "CN" else "成长与中小盘宽基（QQQ/IWM/DIA）"
     return [
         {
             "title": f"大盘点位与周期背景（{flow_start} ~ {flow_end}）",
-            "body": f"{idx_desc}。全市场监控宽基ETF合计净流入 **{total_broad_flow:+.2f}{unit}**，行业/题材ETF合计净流入 **{total_sector_flow:+.2f}{unit}**，宏观/避险锚合计 **{total_macro_flow:+.2f}{unit}**。",
+            "body": (
+                f"{idx_desc}。国家队护盘核心宽基净流向 **{total_core_flow:+.2f}{unit}**，"
+                f"{mkt_broad_role}净流向 **{total_market_broad_flow:+.2f}{unit}**，"
+                f"全市场行业/题材板块合计 **{total_sector_flow:+.2f}{unit}**（宏观/避险锚 **{total_macro_flow:+.2f}{unit}**）。"
+            ),
         },
         {
-            "title": f"主力与核心宽基动向：{stance_label}",
+            "title": f"国家队护盘与宽基阵营：{stance_label}" if market == "CN" else f"主力核心配置动向：{stance_label}",
             "body": f"{core_role}累计净流向 **{total_core_flow:+.2f}{unit}**，综合定性为「{stance_label}」。{anchor_text} {cluster_text}",
         },
         {
-            "title": "大小盘风格偏好",
-            "body": style_summary,
+            "title": "大小盘风格剪刀差",
+            "body": f"大盘权重宽基 **{large_flow:+.2f}{unit}** vs 中小成长宽基 **{small_growth_flow:+.2f}{unit}**；{style_summary}。",
         },
         {
-            "title": "行业与题材轮动特征（四象限）",
+            "title": "全市场行业与题材板块轮动（四象限）",
             "body": (
-                f"净流入前三：{in_str or '无'}；净流出前三：{out_str or '无'}。"
-                f"其中「主线共振（价涨流入）」代表：{res_names}；"
-                f"「逆势抄底（价跌流入）」代表：{dip_names}；"
-                f"「逢高兑现（价涨流出）」代表：{tp_names}。"
+                f"吸金前三板块：{in_str or '无'}；撤离前三板块：{out_str or '无'}。"
+                f"其中「主线共振（价涨流入）」：{res_names}；"
+                f"「逆势抄底（价跌流入）」：{dip_names}；"
+                f"「逢高兑现（价涨流出）」：{tp_names}。"
             ),
         },
     ]

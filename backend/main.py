@@ -166,6 +166,7 @@ class AddEtfRequest(BaseModel):
     market: Literal["CN", "US"]
     code: str = Field(..., min_length=1, max_length=16)
     name: str = Field(..., min_length=1, max_length=64)
+    sector_name: str = ""
     exchange: str = ""
     category: Literal["broad", "sector", "theme", "macro"] = "theme"
     cluster_id: str = "custom_watch"
@@ -254,6 +255,7 @@ def api_add_etf(req: AddEtfRequest) -> dict:
     new_item = {
         "code": code,
         "name": req.name.strip(),
+        "sector_name": req.sector_name.strip() or req.name.strip(),
         "exchange": exchange,
         "category": req.category,
         "cluster_id": req.cluster_id.strip() or "custom_watch",
