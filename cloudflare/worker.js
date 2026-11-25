@@ -8,6 +8,7 @@ import { generateThsToken } from "./ths-token.js";
 
 const APP_VERSION = "0.7.0";
 const CACHE_TTL_SECONDS = 30.0;
+const EDGE_MEM_CACHE = new Map();
 
 const HEADERS_BROWSER = {
   "User-Agent":
@@ -895,10 +896,13 @@ async function handleRealtime(market, force, env, ctx) {
   const nowSec = Date.now() / 1000;
   const kvKey = `rt:${m}`;
 
-  let cachedEntry = null;
-  if (env.ETF_KV) {
+  let cachedEntry = EDGE_MEM_CACHE.get(kvKey) || null;
+  if (!cachedEntry && env.ETF_KV) {
     try {
       cachedEntry = await env.ETF_KV.get(kvKey, "json");
+      if (cachedEntry?.ts && cachedEntry?.payload) {
+        EDGE_MEM_CACHE.set(kvKey, cachedEntry);
+      }
     } catch {
       cachedEntry = null;
     }
@@ -1012,10 +1016,15 @@ async function handleRealtime(market, force, env, ctx) {
     etfs,
   };
 
-  if (env.ETF_KV && ctx?.waitUntil) {
-    ctx.waitUntil(
-      env.ETF_KV.put(kvKey, JSON.stringify({ ts: Date.now() / 1000, payload })).catch(() => {})
-    );
+  const entry = { ts: Date.now() / 1000, payload };
+  EDGE_MEM_CACHE.set(kvKey, entry);
+  if (env.ETF_KV) {
+    const putPromise = env.ETF_KV.put(kvKey, JSON.stringify(entry), {
+      expirationTtl: 300,
+    }).catch(() => {});
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(putPromise);
+    }
   }
   return jsonResponse(payload);
 }
