@@ -22,3 +22,6 @@ data/*.sqlite*
 Thumbs.db
 .vscode/
 .idea/
+
+# Auto-generated analysis reports (kept locally only)
+docs/reports/
