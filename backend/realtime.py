@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 import re
 import threading
 import time
@@ -17,9 +18,14 @@ from akshare.stock_feature.stock_fund_flow import _get_file_content_ths, py_mini
 from backend.db import load_universe
 
 CACHE_TTL_SECONDS = 30.0
+FORCE_REFRESH_COOLDOWN_SECONDS = float(os.getenv("ROOFTOP_RT_FORCE_COOLDOWN", "15.0"))
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _LAST_GOOD_CN_BOARDS: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 _CACHE_LOCK = threading.Lock()
+_MARKET_FETCH_LOCKS: dict[str, threading.Lock] = {
+    "CN": threading.Lock(),
+    "US": threading.Lock(),
+}
 _THS_LOCK = threading.Lock()
 _THS_JS_CTX: Any = None
 
@@ -836,8 +842,30 @@ def _build_realtime_insights(
     ]
 
 
+def _serve_cached_realtime(
+    market: str,
+    cached_ts: float,
+    cached_payload: dict[str, Any],
+    now_ts: float,
+    throttled: bool = False,
+) -> dict[str, Any]:
+    """Clone cached realtime payload with fresh session metadata and cache/cooldown flags."""
+    payload_cached = dict(cached_payload)
+    payload_cached["session"] = _evaluate_market_session_status(
+        market, payload_cached.get("quote_time", "")
+    )
+    payload_cached["from_cache"] = True
+    payload_cached["cooldown_throttled"] = throttled
+    payload_cached["cooldown_remaining"] = (
+        round(max(0.0, FORCE_REFRESH_COOLDOWN_SECONDS - (now_ts - cached_ts)), 1)
+        if throttled
+        else 0.0
+    )
+    return payload_cached
+
+
 def get_realtime_flow_data(market: str = "CN", force: bool = False) -> dict[str, Any]:
-    """Fetch and assemble realtime sector, theme, and ETF flow data with short TTL cache."""
+    """Fetch and assemble realtime sector, theme, and ETF flow data with short TTL cache and force-refresh cooldown."""
     market = market.upper()
     if market not in ("CN", "US"):
         market = "CN"
@@ -845,78 +873,92 @@ def get_realtime_flow_data(market: str = "CN", force: bool = False) -> dict[str,
     now_ts = time.time()
     with _CACHE_LOCK:
         cached = _CACHE.get(market)
-        if not force and cached and (now_ts - cached[0] < CACHE_TTL_SECONDS):
-            payload_cached = dict(cached[1])
-            payload_cached["session"] = _evaluate_market_session_status(
-                market, payload_cached.get("quote_time", "")
-            )
-            return payload_cached
+        if cached:
+            age = now_ts - cached[0]
+            if not force and age < CACHE_TTL_SECONDS:
+                return _serve_cached_realtime(market, cached[0], cached[1], now_ts, throttled=False)
+            if force and age < FORCE_REFRESH_COOLDOWN_SECONDS:
+                return _serve_cached_realtime(market, cached[0], cached[1], now_ts, throttled=True)
 
-    if market == "CN":
-        unit = "亿元"
-        currency = "RMB"
-        indices, etfs, quote_time = _get_cn_realtime_etfs_and_indices()
-        industries, concepts, source = _get_cn_industries_and_concepts()
-    else:
-        unit = "百万美元"
-        currency = "USD"
-        indices, industries, concepts, etfs, quote_time = _get_us_realtime_all()
-        source = "腾讯美股实时行情 + 日内资金流模型 (MFM)"
+    with _MARKET_FETCH_LOCKS[market]:
+        check_ts = time.time()
+        with _CACHE_LOCK:
+            cached = _CACHE.get(market)
+            if cached:
+                age = check_ts - cached[0]
+                if not force and age < CACHE_TTL_SECONDS:
+                    return _serve_cached_realtime(market, cached[0], cached[1], check_ts, throttled=False)
+                if force and age < FORCE_REFRESH_COOLDOWN_SECONDS:
+                    return _serve_cached_realtime(market, cached[0], cached[1], check_ts, throttled=True)
 
-    if not quote_time:
-        quote_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if market == "CN":
+            unit = "亿元"
+            currency = "RMB"
+            indices, etfs, quote_time = _get_cn_realtime_etfs_and_indices()
+            industries, concepts, source = _get_cn_industries_and_concepts()
+        else:
+            unit = "百万美元"
+            currency = "USD"
+            indices, industries, concepts, etfs, quote_time = _get_us_realtime_all()
+            source = "腾讯美股实时行情 + 日内资金流模型 (MFM)"
 
-    session_info = _evaluate_market_session_status(market, quote_time)
+        if not quote_time:
+            quote_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    total_etf_active = round(sum(e["net_flow"] for e in etfs), 2)
-    total_broad_active = round(sum(e["net_flow"] for e in etfs if e["category"] == "broad"), 2)
-    ind_in_cnt = sum(1 for x in industries if x["net_flow"] > 0)
-    con_in_cnt = sum(1 for x in concepts if x["net_flow"] > 0)
+        session_info = _evaluate_market_session_status(market, quote_time)
 
-    quadrant_points = [
-        {**x, "kind": "行业"} for x in industries
-    ] + [
-        {**x, "kind": "题材"} for x in concepts
-    ]
-    # Deduplicate quadrant points by name + kind
-    seen_qp: set[tuple[str, str]] = set()
-    dedup_qp: list[dict[str, Any]] = []
-    for pt in quadrant_points:
-        key = (pt["kind"], pt["name"])
-        if key not in seen_qp:
-            seen_qp.add(key)
-            dedup_qp.append(pt)
+        total_etf_active = round(sum(e["net_flow"] for e in etfs), 2)
+        total_broad_active = round(sum(e["net_flow"] for e in etfs if e["category"] == "broad"), 2)
+        ind_in_cnt = sum(1 for x in industries if x["net_flow"] > 0)
+        con_in_cnt = sum(1 for x in concepts if x["net_flow"] > 0)
 
-    payload = {
-        "market": market,
-        "currency": currency,
-        "unit": unit,
-        "source": source,
-        "quote_time": quote_time,
-        "fetched_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "session": session_info,
-        "indices": indices,
-        "summary": {
-            "top_industry": industries[0] if industries else None,
-            "bottom_industry": industries[-1] if industries else None,
-            "top_concept": concepts[0] if concepts else None,
-            "bottom_concept": concepts[-1] if concepts else None,
-            "total_etf_active_flow": total_etf_active,
-            "total_broad_active_flow": total_broad_active,
-            "industry_in_count": ind_in_cnt,
-            "industry_total": len(industries),
-            "concept_in_count": con_in_cnt,
-            "concept_total": len(concepts),
-        },
-        "insights": _build_realtime_insights(
-            market, unit, indices, industries, concepts, etfs, session_info
-        ),
-        "industries": industries,
-        "concepts": concepts,
-        "quadrant_points": dedup_qp,
-        "etfs": etfs,
-    }
+        quadrant_points = [
+            {**x, "kind": "行业"} for x in industries
+        ] + [
+            {**x, "kind": "题材"} for x in concepts
+        ]
+        # Deduplicate quadrant points by name + kind
+        seen_qp: set[tuple[str, str]] = set()
+        dedup_qp: list[dict[str, Any]] = []
+        for pt in quadrant_points:
+            key = (pt["kind"], pt["name"])
+            if key not in seen_qp:
+                seen_qp.add(key)
+                dedup_qp.append(pt)
 
-    with _CACHE_LOCK:
-        _CACHE[market] = (time.time(), payload)
-    return payload
+        payload = {
+            "market": market,
+            "currency": currency,
+            "unit": unit,
+            "source": source,
+            "quote_time": quote_time,
+            "fetched_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "from_cache": False,
+            "cooldown_throttled": False,
+            "cooldown_remaining": 0.0,
+            "session": session_info,
+            "indices": indices,
+            "summary": {
+                "top_industry": industries[0] if industries else None,
+                "bottom_industry": industries[-1] if industries else None,
+                "top_concept": concepts[0] if concepts else None,
+                "bottom_concept": concepts[-1] if concepts else None,
+                "total_etf_active_flow": total_etf_active,
+                "total_broad_active_flow": total_broad_active,
+                "industry_in_count": ind_in_cnt,
+                "industry_total": len(industries),
+                "concept_in_count": con_in_cnt,
+                "concept_total": len(concepts),
+            },
+            "insights": _build_realtime_insights(
+                market, unit, indices, industries, concepts, etfs, session_info
+            ),
+            "industries": industries,
+            "concepts": concepts,
+            "quadrant_points": dedup_qp,
+            "etfs": etfs,
+        }
+
+        with _CACHE_LOCK:
+            _CACHE[market] = (time.time(), payload)
+        return payload

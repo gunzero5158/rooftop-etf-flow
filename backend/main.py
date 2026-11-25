@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
+import secrets
 import threading
 import time
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -175,10 +177,33 @@ class AddEtfRequest(BaseModel):
     national_team_core: bool = False
 
 
+def _get_admin_token() -> str:
+    """Return optional admin token from environment; empty string disables auth for local dev."""
+    return os.getenv("ROOFTOP_ADMIN_TOKEN", "").strip()
+
+
+def _verify_admin_token(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+) -> None:
+    """Require matching X-Admin-Token header when ROOFTOP_ADMIN_TOKEN is configured."""
+    expected = _get_admin_token()
+    if not expected:
+        return
+    if not x_admin_token or not secrets.compare_digest(x_admin_token.strip(), expected):
+        raise HTTPException(
+            status_code=401,
+            detail="管理员口令错误或未提供，请先输入口令后再执行此操作",
+        )
+
+
 @app.get("/api/health")
-def health() -> dict[str, str]:
+def health() -> dict[str, Any]:
     """Health check endpoint."""
-    return {"status": "ok", "version": __version__}
+    return {
+        "status": "ok",
+        "version": __version__,
+        "admin_protected": bool(_get_admin_token()),
+    }
 
 
 @app.get("/api/v1/etf-flow/dashboard")
@@ -228,13 +253,13 @@ def api_sync_status() -> dict[str, Any]:
     }
 
 
-@app.post("/api/v1/etf-flow/sync")
+@app.post("/api/v1/etf-flow/sync", dependencies=[Depends(_verify_admin_token)])
 def api_sync(req: SyncRequest) -> dict:
     """Trigger incremental or lookback data synchronization and regenerate report."""
     return _run_sync_locked(market=req.market, days=req.days, trigger="manual")
 
 
-@app.post("/api/v1/etf-flow/universe/add")
+@app.post("/api/v1/etf-flow/universe/add", dependencies=[Depends(_verify_admin_token)])
 def api_add_etf(req: AddEtfRequest) -> dict:
     """Add a new ETF to config/etf_universe.json, sync its historical data, and return status."""
     market = req.market.upper()

@@ -24,6 +24,8 @@
     rtTimer: null,
     colorScheme: "red-up", // "red-up" (红涨绿跌) | "green-up" (绿涨红跌)
     detailPayload: null,
+    adminProtected: false,
+    adminToken: "",
   };
 
   try {
@@ -31,8 +33,50 @@
     if (savedScheme === "red-up" || savedScheme === "green-up") {
       state.colorScheme = savedScheme;
     }
+    state.adminToken = sessionStorage.getItem("rooftop_admin_token") || "";
   } catch {
     // Ignore storage access errors
+  }
+
+  async function loadHealthInfo() {
+    try {
+      const res = await fetch("/api/health");
+      if (!res.ok) return;
+      const info = await res.json();
+      state.adminProtected = Boolean(info.admin_protected);
+    } catch {
+      // Ignore health probe failures
+    }
+  }
+
+  function ensureAdminToken(forcePrompt = false) {
+    if (!state.adminProtected && !forcePrompt) {
+      return state.adminToken || "";
+    }
+    if (!forcePrompt && state.adminToken) {
+      return state.adminToken;
+    }
+    const input = window.prompt("当前站点已启用公网管理防护，请输入管理员口令 (ROOFTOP_ADMIN_TOKEN)：");
+    if (!input || !input.trim()) {
+      return null;
+    }
+    const token = input.trim();
+    state.adminToken = token;
+    try {
+      sessionStorage.setItem("rooftop_admin_token", token);
+    } catch {
+      // Ignore storage write errors
+    }
+    return token;
+  }
+
+  function clearAdminToken() {
+    state.adminToken = "";
+    try {
+      sessionStorage.removeItem("rooftop_admin_token");
+    } catch {
+      // Ignore storage write errors
+    }
   }
 
   const charts = {
@@ -904,6 +948,10 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       state.rtData = await res.json();
       renderRealtimeAll();
+      if (force && state.rtData?.cooldown_throttled) {
+        const waitSec = Math.max(1, Math.ceil(state.rtData.cooldown_remaining || 1));
+        showToast(`刷新过于频繁，已返回缓存数据（请在 ${waitSec} 秒后再强刷）`);
+      }
     } finally {
       if (icon) icon.textContent = "↻";
     }
@@ -1709,6 +1757,12 @@
       const form = e.target;
       const msgEl = document.getElementById("add-etf-msg");
       const btn = document.getElementById("btn-submit-add");
+      const token = ensureAdminToken(false);
+      if (token === null) {
+        msgEl.textContent = "已取消：添加标的需要提供管理员口令";
+        msgEl.classList.remove("hidden");
+        return;
+      }
       btn.disabled = true;
       btn.textContent = "拉取历史数据中...";
       msgEl.classList.add("hidden");
@@ -1723,12 +1777,21 @@
           cluster_id: form.cluster_id.value.trim(),
           cluster_name: form.cluster_name.value.trim(),
         };
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["X-Admin-Token"] = token;
         const res = await fetch("/api/v1/etf-flow/universe/add", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify(payload),
         });
         const data = await res.json();
+        if (res.status === 401) {
+          clearAdminToken();
+          state.adminProtected = true;
+          msgEl.textContent = data.detail || "管理员口令错误或未提供，请重新提交并输入正确口令";
+          msgEl.classList.remove("hidden");
+          return;
+        }
         if (!res.ok) {
           msgEl.textContent = data.detail || "添加失败";
           msgEl.classList.remove("hidden");
@@ -1757,6 +1820,11 @@
 
     // Sync post-market button (syncs both CN and US)
     document.getElementById("btn-sync").addEventListener("click", async () => {
+      const token = ensureAdminToken(false);
+      if (token === null) {
+        showToast("已取消：手动同步需要管理员口令", true);
+        return;
+      }
       const btn = document.getElementById("btn-sync");
       const icon = document.getElementById("sync-icon");
       const label = document.getElementById("sync-label");
@@ -1764,12 +1832,23 @@
       icon.innerHTML = '<span class="spinner"></span>';
       label.textContent = "同步中...";
       try {
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["X-Admin-Token"] = token;
         const res = await fetch("/api/v1/etf-flow/sync", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ market: "ALL", days: 25 }),
         });
         const data = await res.json();
+        if (res.status === 401) {
+          clearAdminToken();
+          state.adminProtected = true;
+          showToast(data.detail || "管理员口令错误或未提供，请重新点击并输入正确口令", true);
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(data.detail || `HTTP ${res.status}`);
+        }
         await loadDashboard();
         const cnDate = data?.results?.CN?.latest_flow_date || "--";
         const usDate = data?.results?.US?.latest_flow_date || "--";
@@ -1830,6 +1909,7 @@
   }
 
   wireEvents();
+  loadHealthInfo();
   loadDashboard();
   preloadRealtimeBadge();
   checkSyncStatusAndRefresh();
