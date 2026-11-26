@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111822'/%3E%3Cpath d='M7 7v18h18M22.7 12l-5.1 5.2-2.8-2.7L11 18.3' fill='none' stroke='%232dd4bf' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=0.7.1" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.8.0" />
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -77,7 +77,7 @@
           </div>
         </div>
         <div class="text-xs text-[#9aa7b8] leading-relaxed">
-          上交所 / 深交所 / ETFdb 一级市场真实申赎口径 · 追踪国家队护盘点位锚、宽基簇配置与中长期轮动
+          上交所 / 深交所 / ETFdb 一级市场真实申赎口径 · 追踪大盘核心点位锚、宽基簇配置与中长期轮动
         </div>
       </button>
 
@@ -136,7 +136,7 @@
       <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div class="card-panel p-4">
           <div class="text-xs text-[#a8b5c7] flex items-center justify-between gap-1">
-            <span id="lbl-core-title" class="truncate">国家队护盘核心宽基</span>
+            <span id="lbl-core-title" class="truncate">大盘核心宽基 (300/50 · 护盘代理)</span>
             <span id="kpi-stance-badge" class="badge-tag bg-[#1c2030] text-[#d8e1ea] border border-[#263244] shrink-0">--</span>
           </div>
           <div id="kpi-core-flow" class="text-2xl font-bold mt-1.5 tabular-nums">--</div>
@@ -145,7 +145,7 @@
 
         <div class="card-panel p-4">
           <div class="text-xs text-[#a8b5c7] flex items-center justify-between">
-            <span id="lbl-mkt-broad-title">市场化宽基 (A500/双创/2000)</span>
+            <span id="lbl-mkt-broad-title">市场化宽基 (A500/500/1000/双创等)</span>
             <span id="unit-badge-1" class="text-[11px] text-[#787b86]">亿元</span>
           </div>
           <div id="kpi-broad-flow" class="text-2xl font-bold mt-1.5 tabular-nums">--</div>
@@ -182,7 +182,7 @@
             <span class="w-1 h-4 bg-[#2dd4bf] rounded-full"></span>
             大盘点位 × 资金流向智能复盘总结
           </h2>
-          <span class="text-[11px] text-[#8b98aa]">结合国家队护盘宽基、市场化宽基与全市场板块份额变动自动提炼</span>
+          <span class="text-[11px] text-[#8b98aa]">结合大盘核心宽基、市场化宽基与全市场板块份额变动由规则引擎自动提炼</span>
         </div>
         <div id="insights-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs sm:text-[13px]"></div>
       </section>
@@ -192,11 +192,11 @@
         <div class="card-panel p-4 lg:col-span-7 flex flex-col">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div>
-              <h3 class="text-sm font-bold text-white" id="chart-ts-title">沪深300点位 vs 国家队护盘核心净流向（近60交易日）</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-ts-sub">剔除A500/双创干扰，纯看国家队重仓护盘宽基(300/50/500/1000)；青色虚线对比全板块流向</p>
+              <h3 class="text-sm font-bold text-white" id="chart-ts-title">沪深300点位 vs 大盘核心宽基净流向（近60交易日）</h3>
+              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-ts-sub">柱图纯看大盘权重核心宽基(沪深300/上证50，民间护盘代理池)；青色虚线对比全板块流向</p>
             </div>
             <div class="seg-group" id="ts-flow-mode">
-              <button class="seg-btn active" data-tsmode="core">护盘核心</button>
+              <button class="seg-btn active" data-tsmode="core">大盘核心</button>
               <button class="seg-btn" data-tsmode="market_broad">市场宽基</button>
               <button class="seg-btn" data-tsmode="sector">各板块合计</button>
             </div>
@@ -207,8 +207,8 @@
         <div class="card-panel p-4 lg:col-span-5 flex flex-col">
           <div class="flex items-center justify-between mb-2">
             <div>
-              <h3 class="text-sm font-bold text-white" id="chart-clusters-title">宽基阵营拆解：国家队护盘簇 vs 市场化宽基簇</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-clusters-sub">★ 为国家队重仓护盘核心簇，其余为市场化配置与交易宽基簇</p>
+              <h3 class="text-sm font-bold text-white" id="chart-clusters-title">宽基阵营拆解：大盘核心簇(300/50) vs 市场化宽基簇</h3>
+              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-clusters-sub">★ 为沪深300/上证50大盘核心簇（民间代理观测口径，非官方持仓披露），其余为市场化宽基簇</p>
             </div>
           </div>
           <div id="chart-clusters" class="w-full h-[330px]"></div>
@@ -495,10 +495,23 @@
       </section>
     </div>
 
+    <!-- Global Disclaimer & Methodology Notice -->
+    <section class="card-panel px-4 py-3.5 border-[#263244]/80 bg-[#0d141d]/90">
+      <div class="flex flex-wrap items-center gap-2 mb-1.5">
+        <span class="badge-tag bg-[#fbbf24]/15 text-[#fcd34d] border border-[#fbbf24]/35">免责声明与口径说明</span>
+        <span class="text-[11px] text-[#8b98aa]">本页数据与规则解读仅供研究参考，不构成任何投资建议</span>
+      </div>
+      <ul class="text-[11px] text-[#8b98aa] leading-relaxed space-y-1 list-disc pl-4">
+        <li><strong class="text-[#cbd5e1]">关于“护盘代理”口径：</strong>页面中“大盘核心宽基（沪深300/上证50 · 护盘代理）”仅系参考历史基金定期报告持仓特征及民间通行观察逻辑构建的宽基代理池。日频公开份额变动无法穿透识别具体买方身份（汇金、险资、公募、外资、量化及个人投资者均混同统计），<strong class="text-[#cbd5e1]">不代表任何官方机构操作或市场事实确认</strong>。</li>
+        <li><strong class="text-[#cbd5e1]">关于数据估算误差：</strong>盘后资金净流向按“交易所公开份额变动 × 单位净值”测算，盘中实时资金流按量价及内外盘模型估算，受数据延迟、分红折算及采样池覆盖范围限制，与实际申赎资金可能存在偏差。</li>
+        <li><strong class="text-[#cbd5e1]">非投资建议：</strong>本站所有图表、点位锚及自动复盘文字均由确定性量化规则程序生成，不构成任何证券买卖建议或收益承诺，请独立判断并自行承担交易风险。</li>
+      </ul>
+    </section>
+
   </main>
 
   <footer class="zq-footer py-3.5 text-center text-xs">
-    Rooftop ETF Flow（天台ETF资金流）v0.7.1 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 每日 08:40/17:30/21:00 自动增量更新
+    Rooftop ETF Flow（天台ETF资金流）v0.8.0 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 每日 08:40/17:30/21:00 自动增量更新
   </footer>
 
   <!-- Toast Notification -->
@@ -594,6 +607,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=0.7.1"></script>
+  <script src="/static/app.js?v=0.8.0"></script>
 </body>
 </html>

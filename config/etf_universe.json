@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.8.0",
   "CN": {
     "currency": "RMB",
     "flow_unit": "亿元",
@@ -15,25 +15,43 @@
       {"code": "510310", "name": "沪深300ETF易方达", "exchange": "SSE", "category": "broad", "cluster_id": "hs300", "cluster_name": "沪深300簇", "style": "large_core", "national_team_core": true},
       {"code": "510330", "name": "沪深300ETF华夏", "exchange": "SSE", "category": "broad", "cluster_id": "hs300", "cluster_name": "沪深300簇", "style": "large_core", "national_team_core": true},
       {"code": "159919", "name": "沪深300ETF嘉实", "exchange": "SZSE", "category": "broad", "cluster_id": "hs300", "cluster_name": "沪深300簇", "style": "large_core", "national_team_core": true},
+      {"code": "515330", "name": "沪深300ETF天弘", "exchange": "SSE", "category": "broad", "cluster_id": "hs300", "cluster_name": "沪深300簇", "style": "large_core", "national_team_core": true},
+      {"code": "510360", "name": "沪深300ETF广发", "exchange": "SSE", "category": "broad", "cluster_id": "hs300", "cluster_name": "沪深300簇", "style": "large_core", "national_team_core": true},
 
       {"code": "510050", "name": "上证50ETF华夏", "exchange": "SSE", "category": "broad", "cluster_id": "sz50", "cluster_name": "上证50簇", "style": "large_value", "national_team_core": true},
       {"code": "510100", "name": "上证50ETF易方达", "exchange": "SSE", "category": "broad", "cluster_id": "sz50", "cluster_name": "上证50簇", "style": "large_value", "national_team_core": true},
-
-      {"code": "510500", "name": "中证500ETF南方", "exchange": "SSE", "category": "broad", "cluster_id": "zz500_1000", "cluster_name": "中证500/1000簇", "style": "mid_small", "national_team_core": true},
-      {"code": "512100", "name": "中证1000ETF南方", "exchange": "SSE", "category": "broad", "cluster_id": "zz500_1000", "cluster_name": "中证500/1000簇", "style": "mid_small", "national_team_core": true},
-      {"code": "159845", "name": "中证1000ETF华夏", "exchange": "SZSE", "category": "broad", "cluster_id": "zz500_1000", "cluster_name": "中证500/1000簇", "style": "mid_small", "national_team_core": true},
 
       {"code": "563360", "name": "A500ETF华泰柏瑞", "exchange": "SSE", "category": "broad", "cluster_id": "a500", "cluster_name": "中证A500簇", "style": "large_core", "national_team_core": false},
       {"code": "159352", "name": "A500ETF南方", "exchange": "SZSE", "category": "broad", "cluster_id": "a500", "cluster_name": "中证A500簇", "style": "large_core", "national_team_core": false},
       {"code": "159338", "name": "中证A500ETF国泰", "exchange": "SZSE", "category": "broad", "cluster_id": "a500", "cluster_name": "中证A500簇", "style": "large_core", "national_team_core": false},
       {"code": "159361", "name": "A500ETF易方达", "exchange": "SZSE", "category": "broad", "cluster_id": "a500", "cluster_name": "中证A500簇", "style": "large_core", "national_team_core": false},
+      {"code": "512050", "name": "A500ETF华夏", "exchange": "SSE", "category": "broad", "cluster_id": "a500", "cluster_name": "中证A500簇", "style": "large_core", "national_team_core": false},
+
+      {"code": "510500", "name": "中证500ETF南方", "exchange": "SSE", "category": "broad", "cluster_id": "zz500", "cluster_name": "中证500簇", "style": "mid_small", "national_team_core": false},
+      {"code": "159922", "name": "中证500ETF嘉实", "exchange": "SZSE", "category": "broad", "cluster_id": "zz500", "cluster_name": "中证500簇", "style": "mid_small", "national_team_core": false},
+      {"code": "512500", "name": "中证500ETF华夏", "exchange": "SSE", "category": "broad", "cluster_id": "zz500", "cluster_name": "中证500簇", "style": "mid_small", "national_team_core": false},
+      {"code": "510580", "name": "中证500ETF易方达", "exchange": "SSE", "category": "broad", "cluster_id": "zz500", "cluster_name": "中证500簇", "style": "mid_small", "national_team_core": false},
+
+      {"code": "512100", "name": "中证1000ETF南方", "exchange": "SSE", "category": "broad", "cluster_id": "zz1000", "cluster_name": "中证1000簇", "style": "mid_small", "national_team_core": false},
+      {"code": "560010", "name": "中证1000ETF广发", "exchange": "SSE", "category": "broad", "cluster_id": "zz1000", "cluster_name": "中证1000簇", "style": "mid_small", "national_team_core": false},
+      {"code": "159845", "name": "中证1000ETF华夏", "exchange": "SZSE", "category": "broad", "cluster_id": "zz1000", "cluster_name": "中证1000簇", "style": "mid_small", "national_team_core": false},
+      {"code": "159629", "name": "中证1000ETF富国", "exchange": "SZSE", "category": "broad", "cluster_id": "zz1000", "cluster_name": "中证1000簇", "style": "mid_small", "national_team_core": false},
 
       {"code": "588000", "name": "科创50ETF华夏", "exchange": "SSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
-      {"code": "588080", "name": "科创板50ETF易方达", "exchange": "SSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
+      {"code": "588080", "name": "科创50ETF易方达", "exchange": "SSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
+      {"code": "588050", "name": "科创50ETF工银", "exchange": "SSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
+      {"code": "588220", "name": "科创100ETF鹏华", "exchange": "SSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
+      {"code": "588030", "name": "科创100ETF博时", "exchange": "SSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
       {"code": "159915", "name": "创业板ETF易方达", "exchange": "SZSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
       {"code": "159949", "name": "创业板50ETF华安", "exchange": "SZSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
+      {"code": "159781", "name": "科创创业ETF易方达", "exchange": "SZSE", "category": "broad", "cluster_id": "dual_innovation", "cluster_name": "双创成长簇", "style": "growth", "national_team_core": false},
 
       {"code": "563300", "name": "中证2000ETF华泰柏瑞", "exchange": "SSE", "category": "broad", "cluster_id": "zz2000", "cluster_name": "中证2000微盘簇", "style": "micro_small", "national_team_core": false},
+      {"code": "159531", "name": "中证2000ETF南方", "exchange": "SZSE", "category": "broad", "cluster_id": "zz2000", "cluster_name": "中证2000微盘簇", "style": "micro_small", "national_team_core": false},
+
+      {"code": "159901", "name": "深证100ETF易方达", "exchange": "SZSE", "category": "broad", "cluster_id": "sz100_a50", "cluster_name": "深证100与A50簇", "style": "large_core", "national_team_core": false},
+      {"code": "159593", "name": "A50ETF平安", "exchange": "SZSE", "category": "broad", "cluster_id": "sz100_a50", "cluster_name": "深证100与A50簇", "style": "large_core", "national_team_core": false},
+      {"code": "563080", "name": "中证A50ETF易方达", "exchange": "SSE", "category": "broad", "cluster_id": "sz100_a50", "cluster_name": "深证100与A50簇", "style": "large_core", "national_team_core": false},
 
       {"code": "512480", "name": "半导体ETF", "sector_name": "半导体芯片", "exchange": "SSE", "category": "sector", "cluster_id": "tech_growth", "cluster_name": "科技与TMT成长", "style": "growth", "national_team_core": false},
       {"code": "588200", "name": "科创芯片ETF", "sector_name": "半导体芯片", "exchange": "SSE", "category": "theme", "cluster_id": "tech_growth", "cluster_name": "科技与TMT成长", "style": "growth", "national_team_core": false},
