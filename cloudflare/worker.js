@@ -6,7 +6,7 @@
 
 import { generateThsToken } from "./ths-token.js";
 
-const APP_VERSION = "0.7.0";
+const APP_VERSION = "0.7.1";
 const CACHE_TTL_SECONDS = 30.0;
 const EDGE_MEM_CACHE = new Map();
 

@@ -67,10 +67,6 @@ body {
   border-color: var(--border-strong);
 }
 
-.card-panel-score {
-  border-top: 2px solid var(--primary-teal);
-}
-
 .zq-insight-card {
   background: var(--bg-card-inner);
   border: 1px solid var(--border-tv);

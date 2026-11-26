@@ -372,11 +372,29 @@
 
     const markLineData = [];
     if (d.summary.weighted_anchor_point) {
+      const validCloses = benchCloses.filter((v) => typeof v === "number" && Number.isFinite(v));
+      const minClose = validCloses.length ? Math.min(...validCloses) : d.summary.weighted_anchor_point;
+      const maxClose = validCloses.length ? Math.max(...validCloses) : d.summary.weighted_anchor_point;
+      const span = maxClose - minClose;
+      const relPos = span > 0 ? (d.summary.weighted_anchor_point - minClose) / span : 0.5;
+      const labelPos = relPos > 0.82 ? "insideStartBottom" : "insideStartTop";
       markLineData.push({
         yAxis: d.summary.weighted_anchor_point,
         name: "护盘点位锚",
         lineStyle: { color: "#f59e0b", type: "dashed", width: 1.5 },
-        label: { formatter: `护盘锚 ${d.summary.weighted_anchor_point}`, color: "#fbbf24", fontSize: 11 },
+        label: {
+          position: labelPos,
+          distance: 6,
+          formatter: `护盘锚 ${fmtNum(d.summary.weighted_anchor_point, 2)}`,
+          color: "#fbbf24",
+          fontSize: 11,
+          fontWeight: 600,
+          backgroundColor: "rgba(17, 24, 34, 0.88)",
+          borderColor: "rgba(245, 158, 11, 0.5)",
+          borderWidth: 1,
+          borderRadius: 4,
+          padding: [2, 6],
+        },
       });
     }
 
