@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111822'/%3E%3Cpath d='M7 7v18h18M22.7 12l-5.1 5.2-2.8-2.7L11 18.3' fill='none' stroke='%232dd4bf' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=0.8.0" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.8.1" />
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -438,10 +438,14 @@
       <section class="card-panel p-4 flex flex-col">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div>
-            <h3 class="text-sm font-bold text-white">行业 × 题材 涨跌幅与资金流四象限轮动矩阵</h3>
-            <p class="text-[11px] text-[#8b98aa] mt-0.5">全市场覆盖板块按象限归类汇总，一目了然辨识主线共振、逆势抄底与逢高兑现</p>
+            <h3 class="text-sm font-bold text-white" id="rt-quadrant-title">【分行业】涨跌幅与资金流四象限轮动矩阵</h3>
+            <p class="text-[11px] text-[#8b98aa] mt-0.5" id="rt-quadrant-sub">按行业独立统计四象限轮动，避免与宽口径概念题材混排导致资金重复累加</p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="seg-group" id="rt-quadrant-dim">
+              <button class="seg-btn active" data-qdim="industries">分行业</button>
+              <button class="seg-btn" data-qdim="concepts">分题材</button>
+            </div>
             <div class="seg-group" id="rt-quadrant-mode">
               <button class="seg-btn active" data-qmode="matrix">矩阵视图</button>
               <button class="seg-btn" data-qmode="scatter">散点图</button>
@@ -457,7 +461,7 @@
         <div class="flex items-center justify-between mb-2 gap-2">
           <div>
             <h3 class="text-sm font-bold text-white">监控池 ETF 盘中主动资金流排行（Top 20）</h3>
-            <p class="text-[11px] text-[#8b98aa] mt-0.5">基于内外盘主动买卖差额 / 日内量价乘数实时测算（净流入前10 + 净流出前10）</p>
+            <p class="text-[11px] text-[#8b98aa] mt-0.5" id="rt-etf-rank-sub">默认涵盖本站核心宽基、行业/题材及宏观锚监控池 ETF（支持右上角「+ 新增标的」自定义扩展），按内外盘主动买卖差额/量价模型测算（展示净流入前10 + 净流出前10）</p>
           </div>
           <span class="rt-date-tag badge-tag bg-[#1c2030] text-[#a8b5c7] border border-[#2a2e39]">--</span>
         </div>
@@ -511,7 +515,7 @@
   </main>
 
   <footer class="zq-footer py-3.5 text-center text-xs">
-    Rooftop ETF Flow（天台ETF资金流）v0.8.0 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 每日 08:40/17:30/21:00 自动增量更新
+    Rooftop ETF Flow（天台ETF资金流）v0.8.1 · 盘后份额：上交所/深交所/ETFdb · 实时流：同花顺/新浪/腾讯实时网关 · 每日 08:40/17:30/21:00 自动增量更新
   </footer>
 
   <!-- Toast Notification -->
@@ -607,6 +611,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=0.8.0"></script>
+  <script src="/static/app.js?v=0.8.1"></script>
 </body>
 </html>

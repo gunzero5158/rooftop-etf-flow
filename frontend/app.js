@@ -19,6 +19,7 @@
     rtSortDesc: true,
     rtIndRankMode: "split", // "split" | "inflow" | "outflow"
     rtConRankMode: "split",
+    rtQDim: "industries", // "industries" | "concepts"
     rtQMode: "matrix", // "matrix" | "scatter"
     rtAutoRefresh: false,
     rtTimer: null,
@@ -1156,6 +1157,13 @@
 
     renderRtQuadrantChart(d);
 
+    const etfSubEl = document.getElementById("rt-etf-rank-sub");
+    if (etfSubEl) {
+      const etfCnt = (d.etfs || []).length;
+      const mktTxt = d.market === "CN" ? "A股" : "美股";
+      etfSubEl.textContent = `监控池默认涵盖本站 ${mktTxt} 核心宽基、行业/题材及宏观锚共 ${etfCnt} 只 ETF（支持右上角「+ 新增标的」自定义扩展），按内外盘主动买卖差额/量价模型测算（展示净流入前10 + 净流出前10）`;
+    }
+
     renderHorizontalFlowChart(
       "rtEtfs",
       "chart-rt-etfs",
@@ -1177,10 +1185,25 @@
   }
 
   function renderRtQuadrantChart(d) {
-    const pts = d.quadrant_points || [];
+    const isIndustry = state.rtQDim !== "concepts";
+    const kindLabel = isIndustry ? "行业" : "题材";
+    const sourceList = isIndustry ? d.industries || [] : d.concepts || [];
+    const pts = sourceList.map((x) => ({ ...x, kind: kindLabel }));
+
+    const qTitleEl = document.getElementById("rt-quadrant-title");
+    const qSubEl = document.getElementById("rt-quadrant-sub");
+    if (qTitleEl && qSubEl) {
+      qTitleEl.textContent = isIndustry
+        ? "【分行业】涨跌幅与资金流四象限轮动矩阵"
+        : "【分题材 / 概念】涨跌幅与资金流四象限轮动矩阵";
+      qSubEl.textContent = isIndustry
+        ? `当前覆盖 ${pts.length} 个行业板块 · 独立统计行业四象限轮动，无概念题材重叠累加干扰`
+        : `当前覆盖 ${pts.length} 个概念题材 · 独立对比热门题材日内主线共振与筹码派发`;
+    }
+
     renderQuadrantMatrix("rt-quadrant-matrix", pts, d.unit, d.market, {
       getPct: (x) => x.pct_chg || 0,
-      getSubTag: (x) => x.kind || "",
+      getSubTag: () => "",
     });
 
     const matrixEl = document.getElementById("rt-quadrant-matrix");
@@ -1198,22 +1221,20 @@
     chart.resize();
 
     const scatterPts = [
-      ...(d.industries || []).slice(0, 12).map((x) => ({ ...x, kind: "行业" })),
-      ...(d.industries || []).slice(-10).map((x) => ({ ...x, kind: "行业" })),
-      ...(d.concepts || []).slice(0, 12).map((x) => ({ ...x, kind: "题材" })),
-      ...(d.concepts || []).slice(-10).map((x) => ({ ...x, kind: "题材" })),
-    ];
+      ...pts.slice(0, 18),
+      ...pts.slice(-14),
+    ].filter((x, idx, arr) => arr.findIndex((y) => y.name === x.name) === idx);
     const maxTurn = Math.max(...scatterPts.map((x) => x.turnover || 1), 1);
 
     const scatterData = scatterPts.map((x) => ({
       name: x.name,
       value: [x.pct_chg, x.net_flow, x.turnover, x.kind, x.quadrant, x.net_ratio],
-      symbol: x.kind === "题材" ? "diamond" : "circle",
+      symbol: isIndustry ? "circle" : "diamond",
       symbolSize: Math.max(10, Math.min(30, 10 + Math.sqrt((x.turnover || 1) / maxTurn) * 20)),
       itemStyle: {
         color: colorForVal(x.net_flow, d.market),
         opacity: 0.82,
-        borderColor: x.kind === "题材" ? "#fbbf24" : "#f8fafc",
+        borderColor: isIndustry ? "#f8fafc" : "#fbbf24",
         borderWidth: 1,
       },
     }));
@@ -1721,6 +1742,15 @@
         btn.classList.add("active");
         state.pmQMode = btn.dataset.qmode;
         if (state.data) renderQuadrantChart(state.data);
+      });
+    });
+
+    document.querySelectorAll("#rt-quadrant-dim .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#rt-quadrant-dim .seg-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        state.rtQDim = btn.dataset.qdim;
+        if (state.rtData) renderRtQuadrantChart(state.rtData);
       });
     });
 
