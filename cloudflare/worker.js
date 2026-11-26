@@ -6,7 +6,7 @@
 
 import { generateThsToken } from "./ths-token.js";
 
-const APP_VERSION = "0.8.1";
+const APP_VERSION = "0.8.2";
 const CACHE_TTL_SECONDS = 30.0;
 const EDGE_MEM_CACHE = new Map();
 
@@ -352,39 +352,63 @@ function decodeBuffer(buf, preferGbk = false) {
   return utf8;
 }
 
+async function fetchTencentChunk(chunk, parsed) {
+  const query = chunk.join(",");
+  const endpoints = [
+    `https://qt.gtimg.cn/q=${query}`,
+    `http://qt.gtimg.cn/q=${query}`,
+    `https://web.sqt.gtimg.cn/q=${query}`,
+  ];
+  for (const url of endpoints) {
+    try {
+      const resp = await fetch(url, {
+        headers: HEADERS_BROWSER,
+        signal: AbortSignal.timeout(6500),
+      });
+      if (!resp.ok) continue;
+      const buf = await resp.arrayBuffer();
+      const text = decodeBuffer(buf, true);
+      let count = 0;
+      for (const rawLine of text.trim().split(/\r?\n/)) {
+        if (!rawLine.includes("=") || !rawLine.includes("~")) continue;
+        const eqIdx = rawLine.indexOf("=");
+        const sym = rawLine.slice(0, eqIdx).trim().replace(/^v_/, "");
+        const valPart = rawLine.slice(eqIdx + 1).trim().replace(/^[";]+|[";]+$/g, "");
+        const fields = valPart.split("~");
+        if (fields.length > 35) {
+          parsed[sym] = fields;
+          count++;
+        }
+      }
+      if (count > 0) return count;
+    } catch {
+      // Try next fallback endpoint
+    }
+  }
+  return 0;
+}
+
 async function fetchTencentQuotes(symbols) {
   const parsed = {};
   if (!symbols || symbols.length === 0) return parsed;
 
-  const chunkSize = 60;
+  const chunkSize = 20;
   const tasks = [];
   for (let i = 0; i < symbols.length; i += chunkSize) {
     const chunk = symbols.slice(i, i + chunkSize);
-    const url = `https://qt.gtimg.cn/q=${chunk.join(",")}`;
-    tasks.push(
-      fetch(url, {
-        headers: HEADERS_BROWSER,
-        signal: AbortSignal.timeout(9000),
-      })
-        .then(async (resp) => {
-          if (!resp.ok) return;
-          const buf = await resp.arrayBuffer();
-          const text = decodeBuffer(buf, true);
-          for (const rawLine of text.trim().split(/\r?\n/)) {
-            if (!rawLine.includes("=") || !rawLine.includes("~")) continue;
-            const eqIdx = rawLine.indexOf("=");
-            const sym = rawLine.slice(0, eqIdx).trim().replace(/^v_/, "");
-            const valPart = rawLine.slice(eqIdx + 1).trim().replace(/^[";]+|[";]+$/g, "");
-            const fields = valPart.split("~");
-            if (fields.length > 35) {
-              parsed[sym] = fields;
-            }
-          }
-        })
-        .catch(() => {})
-    );
+    tasks.push(fetchTencentChunk(chunk, parsed));
   }
   await Promise.all(tasks);
+
+  // One final targeted retry pass for any missing symbols
+  const missing = symbols.filter((s) => !parsed[s]);
+  if (missing.length > 0 && missing.length < symbols.length) {
+    const retryTasks = [];
+    for (let i = 0; i < missing.length; i += chunkSize) {
+      retryTasks.push(fetchTencentChunk(missing.slice(i, i + chunkSize), parsed));
+    }
+    await Promise.all(retryTasks);
+  }
   return parsed;
 }
 
@@ -612,10 +636,17 @@ async function getCnIndustriesAndConcepts(prevPayload) {
   return { industries, concepts, source };
 }
 
-async function getCnRealtimeEtfsAndIndices(universe) {
+async function getCnRealtimeEtfsAndIndices(universe, fallbackPayload = null) {
   const cnCfg = universe?.CN || {};
   const indicesCfg = cnCfg.indices || [];
   const etfsCfg = cnCfg.etfs || [];
+
+  const prevIdxMap = Object.fromEntries(
+    (fallbackPayload?.indices || []).map((x) => [x.code, x])
+  );
+  const prevEtfMap = Object.fromEntries(
+    (fallbackPayload?.etfs || []).map((x) => [x.code, x])
+  );
 
   const idxSymbols = indicesCfg.map((idx) => `${idx.prefix}${idx.code}`);
   const etfSymMap = {};
@@ -630,7 +661,10 @@ async function getCnRealtimeEtfsAndIndices(universe) {
   const indicesOut = [];
   for (const idx of indicesCfg) {
     const p = quotes[`${idx.prefix}${idx.code}`];
-    if (!p) continue;
+    if (!p) {
+      if (prevIdxMap[idx.code]) indicesOut.push(prevIdxMap[idx.code]);
+      continue;
+    }
     const rawT = String(p[30] || "").trim();
     if (rawT.length === 14) {
       latestTime = `${rawT.slice(0, 4)}-${rawT.slice(4, 6)}-${rawT.slice(6, 8)} ${rawT.slice(8, 10)}:${rawT.slice(10, 12)}:${rawT.slice(12, 14)}`;
@@ -646,7 +680,10 @@ async function getCnRealtimeEtfsAndIndices(universe) {
   const etfsOut = [];
   for (const [sym, meta] of Object.entries(etfSymMap)) {
     const p = quotes[sym];
-    if (!p) continue;
+    if (!p) {
+      if (prevEtfMap[meta.code]) etfsOut.push(prevEtfMap[meta.code]);
+      continue;
+    }
     const price = round3(safeFloat(p[3]));
     const pctChg = round2(safeFloat(p[32]));
     const totalVol = safeFloat(p[6]);
@@ -940,7 +977,7 @@ async function handleRealtime(market, force, env, ctx) {
     unit = "亿元";
     currency = "RMB";
     const [qRes, bRes] = await Promise.all([
-      getCnRealtimeEtfsAndIndices(universe),
+      getCnRealtimeEtfsAndIndices(universe, cachedEntry?.payload || null),
       getCnIndustriesAndConcepts(cachedEntry?.payload || null),
     ]);
     indices = qRes.indices;
@@ -1017,13 +1054,18 @@ async function handleRealtime(market, force, env, ctx) {
   };
 
   const entry = { ts: Date.now() / 1000, payload };
-  EDGE_MEM_CACHE.set(kvKey, entry);
-  if (env.ETF_KV) {
-    const putPromise = env.ETF_KV.put(kvKey, JSON.stringify(entry), {
-      expirationTtl: 300,
-    }).catch(() => {});
-    if (ctx?.waitUntil) {
-      ctx.waitUntil(putPromise);
+  const expectedEtfCount = (universe?.[m]?.etfs || []).length;
+  const isHealthySnapshot =
+    expectedEtfCount === 0 || etfs.length >= Math.max(1, Math.floor(expectedEtfCount * 0.7));
+  if (isHealthySnapshot) {
+    EDGE_MEM_CACHE.set(kvKey, entry);
+    if (env.ETF_KV) {
+      const putPromise = env.ETF_KV.put(kvKey, JSON.stringify(entry), {
+        expirationTtl: 300,
+      }).catch(() => {});
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(putPromise);
+      }
     }
   }
   return jsonResponse(payload);

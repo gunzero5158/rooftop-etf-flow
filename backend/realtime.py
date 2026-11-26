@@ -157,23 +157,29 @@ def _fetch_tencent_quotes(symbols: list[str]) -> dict[str, list[str]]:
         return {}
     sess = _direct_session()
     parsed: dict[str, list[str]] = {}
-    chunk_size = 60
+    chunk_size = 30
     for i in range(0, len(symbols), chunk_size):
         chunk = symbols[i : i + chunk_size]
         url = f"http://qt.gtimg.cn/q={','.join(chunk)}"
-        try:
-            resp = sess.get(url, timeout=12)
-            resp.encoding = "gbk"
-            for line in resp.text.strip().splitlines():
-                if "=" not in line or "~" not in line:
-                    continue
-                key_part, val_part = line.split("=", 1)
-                sym = key_part.strip().removeprefix("v_")
-                fields = val_part.strip().strip('";').split("~")
-                if len(fields) > 35:
-                    parsed[sym] = fields
-        except Exception:
-            continue
+        for attempt in range(2):
+            try:
+                resp = sess.get(url, timeout=10)
+                resp.encoding = "gbk"
+                got = 0
+                for line in resp.text.strip().splitlines():
+                    if "=" not in line or "~" not in line:
+                        continue
+                    key_part, val_part = line.split("=", 1)
+                    sym = key_part.strip().removeprefix("v_")
+                    fields = val_part.strip().strip('";').split("~")
+                    if len(fields) > 35:
+                        parsed[sym] = fields
+                        got += 1
+                if got > 0:
+                    break
+            except Exception:
+                if attempt == 0:
+                    time.sleep(0.2)
     return parsed
 
 
