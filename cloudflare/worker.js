@@ -357,13 +357,12 @@ async function fetchTencentChunk(chunk, parsed) {
   const endpoints = [
     `https://qt.gtimg.cn/q=${query}`,
     `http://qt.gtimg.cn/q=${query}`,
-    `https://web.sqt.gtimg.cn/q=${query}`,
   ];
   for (const url of endpoints) {
     try {
       const resp = await fetch(url, {
         headers: HEADERS_BROWSER,
-        signal: AbortSignal.timeout(6500),
+        signal: AbortSignal.timeout(2800),
       });
       if (!resp.ok) continue;
       const buf = await resp.arrayBuffer();
@@ -386,6 +385,58 @@ async function fetchTencentChunk(chunk, parsed) {
     }
   }
   return 0;
+}
+
+async function fetchSinaCnQuotes(symbols) {
+  const parsed = {};
+  if (!symbols || symbols.length === 0) return parsed;
+  const chunkSize = 40;
+  const tasks = [];
+  for (let i = 0; i < symbols.length; i += chunkSize) {
+    const chunk = symbols.slice(i, i + chunkSize);
+    const url = `https://hq.sinajs.cn/list=${chunk.join(",")}`;
+    tasks.push(
+      fetch(url, {
+        headers: {
+          ...HEADERS_BROWSER,
+          Referer: "https://finance.sina.com.cn/",
+        },
+        signal: AbortSignal.timeout(6000),
+      })
+        .then(async (resp) => {
+          if (!resp.ok) return;
+          const buf = await resp.arrayBuffer();
+          const text = decodeBuffer(buf, true);
+          for (const rawLine of text.trim().split(/\r?\n/)) {
+            const m = rawLine.match(/^var\s+hq_str_([a-z0-9]+)="([^"]*)";?/i);
+            if (!m || !m[2]) continue;
+            const sym = m[1].toLowerCase();
+            const parts = m[2].split(",");
+            if (parts.length < 32) continue;
+            const prevClose = safeFloat(parts[2]);
+            const price = safeFloat(parts[3]);
+            if (price <= 0) continue;
+            const high = safeFloat(parts[4], price);
+            const low = safeFloat(parts[5], price);
+            const pctChg = prevClose > 0 ? round2(((price - prevClose) / prevClose) * 100.0) : 0.0;
+            const turnoverYuan = safeFloat(parts[9]);
+            const dtStr = `${String(parts[30] || "").trim()} ${String(parts[31] || "").trim()}`.trim();
+            parsed[sym] = {
+              price,
+              prevClose,
+              high,
+              low,
+              pctChg,
+              turnoverYuan,
+              dtStr,
+            };
+          }
+        })
+        .catch(() => {})
+    );
+  }
+  await Promise.all(tasks);
+  return parsed;
 }
 
 async function fetchTencentQuotes(symbols) {
@@ -655,31 +706,78 @@ async function getCnRealtimeEtfsAndIndices(universe, fallbackPayload = null) {
     etfSymMap[`${prefix}${e.code}`] = e;
   }
 
-  const quotes = await fetchTencentQuotes([...idxSymbols, ...Object.keys(etfSymMap)]);
+  const allSymbols = [...idxSymbols, ...Object.keys(etfSymMap)];
+  const quotes = await fetchTencentQuotes(allSymbols);
+  const missingSymbols = allSymbols.filter((s) => !quotes[s]);
+  const sinaQuotes = missingSymbols.length > 0 ? await fetchSinaCnQuotes(missingSymbols) : {};
   let latestTime = "";
 
   const indicesOut = [];
   for (const idx of indicesCfg) {
-    const p = quotes[`${idx.prefix}${idx.code}`];
-    if (!p) {
-      if (prevIdxMap[idx.code]) indicesOut.push(prevIdxMap[idx.code]);
-      continue;
+    const sym = `${idx.prefix}${idx.code}`;
+    const p = quotes[sym];
+    const sq = sinaQuotes[sym];
+    if (p) {
+      const rawT = String(p[30] || "").trim();
+      if (rawT.length === 14) {
+        latestTime = `${rawT.slice(0, 4)}-${rawT.slice(4, 6)}-${rawT.slice(6, 8)} ${rawT.slice(8, 10)}:${rawT.slice(10, 12)}:${rawT.slice(12, 14)}`;
+      }
+      indicesOut.push({
+        code: idx.code,
+        name: idx.name,
+        close: round2(safeFloat(p[3])),
+        pct_chg: round2(safeFloat(p[32])),
+      });
+    } else if (sq) {
+      if (sq.dtStr && sq.dtStr.length >= 19) latestTime = sq.dtStr;
+      indicesOut.push({
+        code: idx.code,
+        name: idx.name,
+        close: round2(sq.price),
+        pct_chg: sq.pctChg,
+      });
+    } else if (prevIdxMap[idx.code]) {
+      indicesOut.push(prevIdxMap[idx.code]);
     }
-    const rawT = String(p[30] || "").trim();
-    if (rawT.length === 14) {
-      latestTime = `${rawT.slice(0, 4)}-${rawT.slice(4, 6)}-${rawT.slice(6, 8)} ${rawT.slice(8, 10)}:${rawT.slice(10, 12)}:${rawT.slice(12, 14)}`;
-    }
-    indicesOut.push({
-      code: idx.code,
-      name: idx.name,
-      close: round2(safeFloat(p[3])),
-      pct_chg: round2(safeFloat(p[32])),
-    });
   }
 
   const etfsOut = [];
   for (const [sym, meta] of Object.entries(etfSymMap)) {
     const p = quotes[sym];
+    const sq = sinaQuotes[sym];
+    if (!p && sq) {
+      if (!latestTime && sq.dtStr && sq.dtStr.length >= 19) latestTime = sq.dtStr;
+      const price = round3(sq.price);
+      const pctChg = sq.pctChg;
+      const turnoverYi = round2(sq.turnoverYuan / 1e8);
+      const spread = Math.max(sq.high - sq.low, 0.0001);
+      const clv = Math.max(-1.0, Math.min(1.0, ((sq.price - sq.low) - (sq.high - sq.price)) / spread));
+      const pctComp = Math.max(-1.0, Math.min(1.0, pctChg / 2.5));
+      const mfm = Math.max(-0.85, Math.min(0.85, 0.55 * clv + 0.45 * pctComp));
+      const activeNetFlow = round2(turnoverYi * mfm * 0.4);
+      const activeRatio = turnoverYi > 0 ? round2((activeNetFlow / turnoverYi) * 100.0) : 0.0;
+      const inflowYi = round2((turnoverYi + activeNetFlow) / 2.0);
+      const outflowYi = round2((turnoverYi - activeNetFlow) / 2.0);
+      etfsOut.push({
+        code: meta.code,
+        name: meta.name,
+        category: meta.category,
+        cluster_name: meta.cluster_name,
+        price,
+        pct_chg: pctChg,
+        net_flow: activeNetFlow,
+        net_ratio: activeRatio,
+        inflow: inflowYi,
+        outflow: outflowYi,
+        turnover: turnoverYi,
+        vol_ratio: 1.0,
+        turnover_rate: 0.0,
+        discount_pct: 0.0,
+        iopv: price,
+        quadrant: classifyQuadrant(pctChg, activeNetFlow),
+      });
+      continue;
+    }
     if (!p) {
       if (prevEtfMap[meta.code]) etfsOut.push(prevEtfMap[meta.code]);
       continue;
