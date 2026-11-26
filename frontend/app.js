@@ -175,7 +175,7 @@
     document.getElementById("unit-badge-1").textContent = d.unit;
     document.getElementById("unit-badge-2").textContent = d.unit;
     document.getElementById("lbl-core-title").textContent =
-      d.market === "CN" ? "大盘核心宽基 (300/50 · 护盘代理)" : "核心配置宽基 (SPY/VOO/IVV)";
+      d.market === "CN" ? "汪汪队宽基 (300/50)" : "核心配置宽基 (SPY/VOO/IVV)";
     const mktBroadTitleEl = document.getElementById("lbl-mkt-broad-title");
     if (mktBroadTitleEl) {
       mktBroadTitleEl.textContent =
@@ -185,10 +185,10 @@
     const clsSubEl = document.getElementById("chart-clusters-sub");
     if (clsTitleEl && clsSubEl) {
       clsTitleEl.textContent =
-        d.market === "CN" ? "宽基阵营拆解：大盘核心簇(300/50) vs 市场化宽基簇" : "美股宽基簇净流向对比";
+        d.market === "CN" ? "宽基阵营拆解：汪汪队(300/50) vs 市场化宽基" : "美股宽基簇净流向对比";
       clsSubEl.textContent =
         d.market === "CN"
-          ? "★ 为沪深300/上证50大盘核心簇（民间代理观测口径，非官方持仓披露），其余为市场化宽基簇"
+          ? "★ 为沪深300/上证50宽基簇（民间戏称“汪汪队”代理池，非官方持仓披露），其余为市场化宽基簇"
           : "★ 为标普500核心配置簇(SPY/VOO/IVV)，其余为纳指成长与道指罗素簇";
     }
 
@@ -265,7 +265,7 @@
     const anchorEl = document.getElementById("kpi-anchor-point");
     if (s.weighted_anchor_point !== null && s.weighted_anchor_point !== undefined) {
       const idxName = d.market === "CN" ? "沪深300" : "标普500";
-      let txt = `核心买入点位锚：${idxName} ${fmtNum(s.weighted_anchor_point, 2)}`;
+      let txt = `${d.market === "CN" ? "汪汪队点位锚" : "核心点位锚"}：${idxName} ${fmtNum(s.weighted_anchor_point, 2)}`;
       if (d.market === "CN" && s.weighted_alt_point) {
         txt += ` / 上证 ${fmtNum(s.weighted_alt_point, 2)}`;
       }
@@ -322,7 +322,7 @@
 
     const isCN = d.market === "CN";
     const benchName = isCN ? "沪深300点位" : "标普500点位";
-    const coreLabel = isCN ? "大盘核心宽基(300/50)" : "标普核心配置";
+    const coreLabel = isCN ? "汪汪队宽基(300/50)" : "标普核心配置";
     const mktBroadLabel = isCN ? "市场化宽基(A500/500/1000/双创等)" : "成长与中小盘宽基";
     const secLabel = "各板块合计流向";
 
@@ -331,7 +331,7 @@
     let barRaw = ts.map((x) => x.core_flow ?? 0);
     let lineRaw = ts.map((x) => x.sector_flow ?? 0);
     let subText = isCN
-      ? "剔除中小盘与双创噪音，柱图纯看沪深300/上证50核心宽基（民间护盘代理池）；虚线对比全市场各板块流向"
+      ? "剔除中小盘与双创噪音，柱图纯看沪深300/上证50（民间戏称“汪汪队”代理池）；虚线对比全市场各板块流向"
       : "柱图纯看标普500三大旗舰配置盘(SPY/VOO/IVV)；虚线对比美股各行业与题材板块合计流向";
 
     if (state.tsFlowMode === "market_broad") {
@@ -340,14 +340,16 @@
       barRaw = ts.map((x) => x.market_broad_flow ?? Number(((x.broad_flow || 0) - (x.core_flow || 0)).toFixed(2)));
       lineRaw = ts.map((x) => x.core_flow ?? 0);
       subText = isCN
-        ? "柱图展示市场化活跃宽基(A500/中证500/1000/双创/2000/深100/A50)；虚线对比大盘核心宽基流向"
+        ? "柱图展示市场化活跃宽基(A500/中证500/1000/双创/2000/深100/A50)；虚线对比汪汪队宽基流向"
         : "柱图展示纳指100与罗素道指宽基(QQQ/IWM/DIA)；虚线对比标普500核心配置流向";
     } else if (state.tsFlowMode === "sector") {
       barSeriesName = secLabel;
       lineSeriesName = coreLabel;
       barRaw = ts.map((x) => x.sector_flow ?? 0);
       lineRaw = ts.map((x) => x.core_flow ?? 0);
-      subText = "柱图展示全市场行业与题材板块 ETF 每日净流向合计；虚线对比大盘核心宽基流向";
+      subText = isCN
+        ? "柱图展示全市场行业与题材板块 ETF 每日净流向合计；虚线对比汪汪队宽基流向"
+        : "柱图展示全市场行业与题材板块 ETF 每日净流向合计；虚线对比标普500核心配置流向";
     }
 
     const barData = barRaw.map((v) => ({
@@ -380,12 +382,12 @@
       const labelPos = relPos > 0.82 ? "insideStartBottom" : "insideStartTop";
       markLineData.push({
         yAxis: d.summary.weighted_anchor_point,
-        name: "核心买入点位锚",
+        name: isCN ? "汪汪队点位锚" : "核心点位锚",
         lineStyle: { color: "#f59e0b", type: "dashed", width: 1.5 },
         label: {
           position: labelPos,
           distance: 6,
-          formatter: `核心锚 ${fmtNum(d.summary.weighted_anchor_point, 2)}`,
+          formatter: `${isCN ? "汪汪队锚" : "核心锚"} ${fmtNum(d.summary.weighted_anchor_point, 2)}`,
           color: "#fbbf24",
           fontSize: 11,
           fontWeight: 600,
@@ -510,7 +512,7 @@
             const c = clusters[params[0].dataIndex];
             const roleTag = c.national_team_core
               ? d.market === "CN"
-                ? '<span style="color:#fbbf24;">[★ 大盘核心簇 · 护盘代理]</span>'
+                ? '<span style="color:#fbbf24;">[★ 汪汪队核心簇]</span>'
                 : '<span style="color:#fbbf24;">[★ 核心配置宽基簇]</span>'
               : '<span style="color:#94a3b8;">[市场化宽基簇]</span>';
             return `

@@ -678,7 +678,7 @@ def _build_narrative_insights(
             f"；{alt_idx['name']}收报 **{alt_idx['period_close']}**（**{alt_idx['period_pct_chg']:+.2f}%**）"
         )
 
-    core_role = "大盘权重核心宽基（沪深300/上证50，护盘代理池）" if market == "CN" else "标普500核心配置盘（SPY/VOO/IVV）"
+    core_role = "汪汪队代理宽基（沪深300/上证50）" if market == "CN" else "标普500核心配置盘（SPY/VOO/IVV）"
     anchor_text = ""
     if weighted_anchor_point is not None:
         anchor_name = "沪深300" if market == "CN" else "标普500"
@@ -725,13 +725,13 @@ def _build_narrative_insights(
         {
             "title": f"大盘点位与周期背景（{flow_start} ~ {flow_end}）",
             "body": (
-                f"{idx_desc}。大盘核心宽基（300/50 护盘代理池）净流向 **{total_core_flow:+.2f}{unit}**，"
+                f"{idx_desc}。汪汪队宽基（300/50）净流向 **{total_core_flow:+.2f}{unit}**，"
                 f"{mkt_broad_role}净流向 **{total_market_broad_flow:+.2f}{unit}**，"
                 f"全市场行业/题材板块合计 **{total_sector_flow:+.2f}{unit}**（宏观/避险锚 **{total_macro_flow:+.2f}{unit}**）。"
             ),
         },
         {
-            "title": f"大盘权重核心与宽基阵营：{stance_label}" if market == "CN" else f"主力核心配置动向：{stance_label}",
+            "title": f"汪汪队与宽基阵营：{stance_label}" if market == "CN" else f"主力核心配置动向：{stance_label}",
             "body": f"{core_role}累计净流向 **{total_core_flow:+.2f}{unit}**，综合定性为「{stance_label}」。{anchor_text} {cluster_text}",
         },
         {

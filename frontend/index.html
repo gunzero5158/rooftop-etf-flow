@@ -77,7 +77,7 @@
           </div>
         </div>
         <div class="text-xs text-[#9aa7b8] leading-relaxed">
-          上交所 / 深交所 / ETFdb 一级市场真实申赎口径 · 追踪大盘核心点位锚、宽基簇配置与中长期轮动
+          上交所 / 深交所 / ETFdb 一级市场真实申赎口径 · 追踪汪汪队点位锚、宽基簇配置与中长期轮动
         </div>
       </button>
 
@@ -136,11 +136,11 @@
       <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div class="card-panel p-4">
           <div class="text-xs text-[#a8b5c7] flex items-center justify-between gap-1">
-            <span id="lbl-core-title" class="truncate">大盘核心宽基 (300/50 · 护盘代理)</span>
+            <span id="lbl-core-title" class="truncate">汪汪队宽基 (300/50)</span>
             <span id="kpi-stance-badge" class="badge-tag bg-[#1c2030] text-[#d8e1ea] border border-[#263244] shrink-0">--</span>
           </div>
           <div id="kpi-core-flow" class="text-2xl font-bold mt-1.5 tabular-nums">--</div>
-          <div class="text-xs text-[#8b98aa] mt-1.5 tabular-nums truncate" id="kpi-anchor-point">加权买入点位锚：--</div>
+          <div class="text-xs text-[#8b98aa] mt-1.5 tabular-nums truncate" id="kpi-anchor-point">汪汪队点位锚：--</div>
         </div>
 
         <div class="card-panel p-4">
@@ -182,7 +182,7 @@
             <span class="w-1 h-4 bg-[#2dd4bf] rounded-full"></span>
             大盘点位 × 资金流向智能复盘总结
           </h2>
-          <span class="text-[11px] text-[#8b98aa]">结合大盘核心宽基、市场化宽基与全市场板块份额变动由规则引擎自动提炼</span>
+          <span class="text-[11px] text-[#8b98aa]">结合汪汪队宽基、市场化宽基与全市场板块份额变动由规则引擎自动提炼</span>
         </div>
         <div id="insights-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs sm:text-[13px]"></div>
       </section>
@@ -192,11 +192,11 @@
         <div class="card-panel p-4 lg:col-span-7 flex flex-col">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div>
-              <h3 class="text-sm font-bold text-white" id="chart-ts-title">沪深300点位 vs 大盘核心宽基净流向（近60交易日）</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-ts-sub">柱图纯看大盘权重核心宽基(沪深300/上证50，民间护盘代理池)；青色虚线对比全板块流向</p>
+              <h3 class="text-sm font-bold text-white" id="chart-ts-title">沪深300点位 vs 汪汪队宽基净流向（近60交易日）</h3>
+              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-ts-sub">柱图纯看沪深300/上证50核心宽基（民间戏称“汪汪队”代理池）；青色虚线对比全板块流向</p>
             </div>
             <div class="seg-group" id="ts-flow-mode">
-              <button class="seg-btn active" data-tsmode="core">大盘核心</button>
+              <button class="seg-btn active" data-tsmode="core">汪汪队</button>
               <button class="seg-btn" data-tsmode="market_broad">市场宽基</button>
               <button class="seg-btn" data-tsmode="sector">各板块合计</button>
             </div>
@@ -207,8 +207,8 @@
         <div class="card-panel p-4 lg:col-span-5 flex flex-col">
           <div class="flex items-center justify-between mb-2">
             <div>
-              <h3 class="text-sm font-bold text-white" id="chart-clusters-title">宽基阵营拆解：大盘核心簇(300/50) vs 市场化宽基簇</h3>
-              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-clusters-sub">★ 为沪深300/上证50大盘核心簇（民间代理观测口径，非官方持仓披露），其余为市场化宽基簇</p>
+              <h3 class="text-sm font-bold text-white" id="chart-clusters-title">宽基阵营拆解：汪汪队(300/50) vs 市场化宽基</h3>
+              <p class="text-[11px] text-[#8b98aa] mt-0.5" id="chart-clusters-sub">★ 为沪深300/上证50宽基簇（民间戏称“汪汪队”代理池，非官方持仓披露），其余为市场化宽基簇</p>
             </div>
           </div>
           <div id="chart-clusters" class="w-full h-[330px]"></div>
@@ -502,7 +502,7 @@
         <span class="text-[11px] text-[#8b98aa]">本页数据与规则解读仅供研究参考，不构成任何投资建议</span>
       </div>
       <ul class="text-[11px] text-[#8b98aa] leading-relaxed space-y-1 list-disc pl-4">
-        <li><strong class="text-[#cbd5e1]">关于“护盘代理”口径：</strong>页面中“大盘核心宽基（沪深300/上证50 · 护盘代理）”仅系参考历史基金定期报告持仓特征及民间通行观察逻辑构建的宽基代理池。日频公开份额变动无法穿透识别具体买方身份（汇金、险资、公募、外资、量化及个人投资者均混同统计），<strong class="text-[#cbd5e1]">不代表任何官方机构操作或市场事实确认</strong>。</li>
+        <li><strong class="text-[#cbd5e1]">关于“汪汪队”代理口径：</strong>页面中“汪汪队宽基（沪深300/上证50）”系沿用 A 股民间戏称，仅参考历史基金定期报告持仓特征及市场通行观察逻辑构建的宽基代理池。日频公开份额变动无法穿透识别具体买方身份（汇金、险资、公募、外资、量化及个人投资者均混同统计），<strong class="text-[#cbd5e1]">不代表任何官方机构操作或市场事实确认</strong>。</li>
         <li><strong class="text-[#cbd5e1]">关于数据估算误差：</strong>盘后资金净流向按“交易所公开份额变动 × 单位净值”测算，盘中实时资金流按量价及内外盘模型估算，受数据延迟、分红折算及采样池覆盖范围限制，与实际申赎资金可能存在偏差。</li>
         <li><strong class="text-[#cbd5e1]">非投资建议：</strong>本站所有图表、点位锚及自动复盘文字均由确定性量化规则程序生成，不构成任何证券买卖建议或收益承诺，请独立判断并自行承担交易风险。</li>
       </ul>
