@@ -31,8 +31,16 @@ def build_kv_items(include_assets: bool = False) -> list[dict[str, str]]:
     items: list[dict[str, str]] = []
 
     for market in ("CN", "US"):
+        probe = get_dashboard_data(market=market, period="5d")
+        if not probe.get("time_series"):
+            print(
+                f"[SKIP] Market {market} has no valid flow time_series; "
+                "skipping dash/etfs KV keys to avoid overwriting live data."
+            )
+            continue
+
         for period in ("1d", "5d", "20d", "60d"):
-            payload = get_dashboard_data(market=market, period=period)
+            payload = probe if period == "5d" else get_dashboard_data(market=market, period=period)
             items.append(
                 {
                     "key": f"dash:{market}:{period}",
